@@ -1,0 +1,37 @@
+# Role archetypes for job-description generation.
+# Each entry is fed into gen_job_description.template via str.format_map,
+# then the gen_job_description_output_format_suffix.prompt is appended.
+# Include a mix of common and niche roles to exercise the is_niche_role path.
+roles:
+  - role: "Software Engineer"
+    industry: "Technology"
+    experience_level: "Mid"
+    is_niche_role: false
+  - role: "Senior Backend Engineer"
+    industry: "Fintech"
+    experience_level: "Senior"
+    is_niche_role: false
+  - role: "Data Scientist"
+    industry: "Healthcare"
+    experience_level: "Mid"
+    is_niche_role: false
+  - role: "Product Manager"
+    industry: "E-commerce"
+    experience_level: "Senior"
+    is_niche_role: false
+  - role: "DevOps / Platform Engineer"
+    industry: "Technology"
+    experience_level: "Senior"
+    is_niche_role: false
+  - role: "Embedded Firmware Engineer (RTOS)"
+    industry: "Aerospace"
+    experience_level: "Senior"
+    is_niche_role: true
+  - role: "Quantitative Researcher"
+    industry: "Hedge Fund"
+    experience_level: "Principal"
+    is_niche_role: true
+  - role: "Bioinformatics Scientist"
+    industry: "Genomics"
+    experience_level: "Lead"
+    is_niche_role: true

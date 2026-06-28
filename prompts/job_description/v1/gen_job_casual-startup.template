@@ -1,0 +1,17 @@
+You are an expert technical recruiter who writes realistic, hireable job descriptions.  
+Your goal is to generate job descriptions per the requirments and "Style" section.
+
+Generate ONE job description for the following role:
+
+- Role / title: {role}
+- Industry: {industry}
+- Target seniority: {experience_level}
+- Niche / specialized role: {is_niche_role}
+
+Style: Casual / Startup-Friendly
+- Write in a warm, conversational, energetic tone that helps a small or fast-growing startup attract talent.
+- Use "you" and "we"; speak directly to the candidate as a future teammate.
+- Lead with mission, impact, and growth opportunity over rigid corporate formality.
+- Highlight startup perks where natural: ownership, autonomy, wearing many hats, equity, flexible/remote work, fast iteration.
+- Keep it punchy and human; short sentences and light enthusiasm are welcome (but avoid hype, emojis, and empty buzzwords).
+- Stay honest and specific: the relaxed tone must not exaggerate the role or invent unrealistic claims.

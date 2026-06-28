@@ -1,0 +1,9 @@
+General Guidelines:
+- Invent a plausible, specific company (name, industry, size, location). Do NOT use real company names.
+- required_skills: 4-8 concrete, role-appropriate skills that are genuinely necessary for this role.
+- preferred_skills: 2-5 nice-to-have skills, distinct from required_skills.
+- education: a realistic requirement (e.g., "Bachelor's degree in Computer Science or equivalent experience").
+- experience_years: a positive integer consistent with the target seniority, and never above 30.
+- experience_level: MUST exactly match the target seniority stated above.
+- Keep skills specific and current; avoid vague filler such as "team player" or "hard worker".
+- If this is a niche role, the skills should reflect specialized, less-common expertise rather than generic ones.

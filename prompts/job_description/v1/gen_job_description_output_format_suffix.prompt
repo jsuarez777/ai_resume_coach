@@ -1,0 +1,30 @@
+Return ONLY a single JSON object (no markdown, no code fences, no commentary) that exactly matches this schema:
+
+{
+  "company": {
+    "name": "<string>",
+    "industry": "<string>",
+    "size": "<string, e.g. '51-200 employees'>",
+    "location": "<string, e.g. 'Austin, TX'>"
+  },
+  "requirements": {
+    "required_skills": ["<string>", "..."],
+    "preferred_skills": ["<string>", "..."],
+    "education": "<string>",
+    "experience_years": "<positive integer, <= 30>",
+    "experience_level": "<one of: Entry, Junior, Mid, Intermediate, Senior, Lead, Principal, Executive, Director, VP>"
+  },
+  "metadata": {
+    "trace_id": "<string identifier for this generation>",
+    "generated_at": "<ISO-8601 timestamp, e.g. 2026-06-20T14:30:00Z>",
+    "is_niche_role": "<true|false>"
+  }
+}
+
+Rules:
+- Output must be valid JSON that parses directly into the JobDescription model.
+- "experience_level" must be exactly one of the allowed values listed above.
+- "experience_years" must be a positive integer and must not exceed 30.
+- "is_niche_role" must be a JSON boolean (true or false), not a string.
+- Do not include any keys other than those shown.
+- Do not wrap the JSON in backticks or surrounding prose.
