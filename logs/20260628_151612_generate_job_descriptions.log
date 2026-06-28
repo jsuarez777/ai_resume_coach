@@ -1,0 +1,37 @@
+
+Version: v1 | mode: even | model: gpt-4.1-mini | temp: unset | parallel: 20
+
+Plan: 20 job(s) across 6 style(s)
+  ai-generated           4   (Data Scientist×1, Product Manager×1, Senior Backend Engineer×1, Software Engineer×1)
+  casual-startup         4   (Data Scientist×1, Product Manager×1, Senior Backend Engineer×1, Software Engineer×1)
+  formal-corporate       3   (Data Scientist×1, Senior Backend Engineer×1, Software Engineer×1)
+  government-public      3   (Data Scientist×1, Senior Backend Engineer×1, Software Engineer×1)
+  mom-and-pop            3   (Data Scientist×1, Senior Backend Engineer×1, Software Engineer×1)
+  technical-detailed     3   (Data Scientist×1, Senior Backend Engineer×1, Software Engineer×1)
+Logging to /Volumes/main/Users/wampa007/dev/ai_bootcamp/miniproject2/logs/20260628_151612_generate_job_descriptions.log
+
+Generating 20 job(s) with up to 20 parallel worker(s)...
+[1/20] OK    mom-and-pop/Data Scientist
+[2/20] OK    mom-and-pop/Senior Backend Engineer
+[3/20] OK    government-public/Data Scientist
+[4/20] OK    ai-generated/Data Scientist
+[5/20] OK    mom-and-pop/Software Engineer
+[6/20] OK    casual-startup/Product Manager
+[7/20] OK    formal-corporate/Software Engineer
+[8/20] OK    casual-startup/Software Engineer
+[9/20] OK    casual-startup/Senior Backend Engineer
+[10/20] OK    formal-corporate/Data Scientist
+[11/20] OK    technical-detailed/Data Scientist
+[12/20] OK    government-public/Software Engineer
+[13/20] OK    formal-corporate/Senior Backend Engineer
+[14/20] OK    casual-startup/Data Scientist
+[15/20] OK    technical-detailed/Senior Backend Engineer
+[16/20] OK    ai-generated/Senior Backend Engineer
+[17/20] OK    government-public/Senior Backend Engineer
+[18/20] OK    ai-generated/Software Engineer
+[19/20] OK    technical-detailed/Software Engineer
+[20/20] OK    ai-generated/Product Manager
+
+Done in 12.9s  (20 jobs, 0.65s/job avg, 1.5 jobs/s)  —  valid 20, invalid 0
+Valid:   20 -> /Volumes/main/Users/wampa007/dev/ai_bootcamp/miniproject2/data/job_description/v1/jobs_20260628_151612.jsonl
+Invalid: 0 -> /Volumes/main/Users/wampa007/dev/ai_bootcamp/miniproject2/data/job_description/v1/invalid_20260628_151612.jsonl
