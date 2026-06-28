@@ -16,6 +16,10 @@ place with exponential backoff while the worker holds its pool slot, so an older
 in-flight request keeps its place and is not starved by newer queued submissions
 (imitates miniproject1's generate_qa_set.py).
 
+A schema/parse failure triggers a correction loop: the original prompt, the bad
+output, and the Pydantic validation errors are fed back to the model asking for a
+fix, up to MAX_CORRECTIONS times before the record is recorded as invalid.
+
 Run from the project root (or anywhere; the project root is added to sys.path):
 
     export OPENAI_API_KEY='sk-...'
@@ -45,6 +49,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
+from pydantic import ValidationError
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -59,6 +64,7 @@ DEFAULT_COUNT = 50
 DEFAULT_PARALLEL = 8
 MAX_RETRIES = 5
 RETRY_BASE_DELAY = 2.0  # seconds; doubles on each 429 retry
+MAX_CORRECTIONS = 3  # validation-failure correction attempts before giving up
 MODES = ["even", "random", "custom", "single"]
 PROMPTS_DIR = PROJECT_ROOT / "prompts" / "job_description"
 OUTPUT_BASE = PROJECT_ROOT / "data" / "job_description"
@@ -124,15 +130,11 @@ def stamp_metadata(data: dict, style: str) -> dict:
     return data
 
 
-def _generate_one(
-    client: MyOpenAIClient, version_dir: Path, style: str, role: dict
-) -> tuple[str, dict, str | None, str | None]:
-    """Worker: assemble -> query -> parse -> validate, returning a record or error.
+def _query_with_backoff(client: MyOpenAIClient, prompt_input: object, label: str) -> str:
+    """One LLM call with in-place 429/timeout exponential backoff.
 
-    On a rate-limit (429), retries in place with exponential backoff while still
-    holding this worker's pool slot. That keeps an older in-flight request in its
-    place rather than letting newer queued submissions jump ahead and starve it.
-    Returns (style, role, record_json_or_None, error_or_None).
+    The worker holds its pool slot while sleeping, so an older in-flight request
+    keeps its place rather than letting newer queued submissions jump ahead.
     """
     try:
         from openai import APITimeoutError, RateLimitError
@@ -143,27 +145,87 @@ def _generate_one(
 
         retryable = (RateLimitError,)
 
-    prompt = assemble_prompt(version_dir, style, role)
-    label = f"{style}/{role.get('role', '?')}"
     delay = RETRY_BASE_DELAY
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            response = client.query(input=prompt)
-            raw = getattr(response, "output_text", None) or str(response)
-            data = stamp_metadata(extract_json(raw), style)
-            job = JobDescription.model_validate(data)
-            return style, role, job.model_dump_json(), None
-        except retryable as exc:
+            response = client.query(input=prompt_input)
+            return getattr(response, "output_text", None) or str(response)
+        except retryable:
             if attempt == MAX_RETRIES:
-                return style, role, None, f"{type(exc).__name__}: {exc}"
+                raise
             log.warning(
                 f"  [rate limit] {label}: attempt {attempt}/{MAX_RETRIES}, retrying in {delay:.1f}s..."
             )
             time.sleep(delay)
             delay *= 2
-        except Exception as exc:  # noqa: BLE001 - non-retryable (parse/validation): record and move on
-            return style, role, None, f"{type(exc).__name__}: {exc}"
-    return style, role, None, "exhausted retries"
+    raise RuntimeError("unreachable: backoff loop always returns or raises")
+
+
+def _format_validation_error(exc: Exception) -> str:
+    """Readable one-line summary of a Pydantic/JSON failure (for logs + correction prompts)."""
+    if isinstance(exc, ValidationError):
+        return "; ".join(
+            f"{'.'.join(str(x) for x in e.get('loc', ()))}: {e.get('msg')}" for e in exc.errors()
+        )
+    return f"{type(exc).__name__}: {exc}"
+
+
+def _build_correction_prompt(original_prompt: str, bad_output: str, errors: str) -> str:
+    """Re-issue the original prompt plus the bad output and validation errors so the
+    model can fix its own response."""
+    return (
+        f"{original_prompt}\n\n"
+        "--- CORRECTION REQUEST ---\n"
+        "Your previous response failed schema validation and must be fixed.\n\n"
+        f"PREVIOUS RESPONSE:\n{bad_output}\n\n"
+        f"VALIDATION ERRORS:\n{errors}\n\n"
+        "Return a corrected JSON object that fixes ALL of the errors above while still "
+        "following every rule in the instructions. Output ONLY the corrected JSON object."
+    )
+
+
+def _generate_one(
+    client: MyOpenAIClient, version_dir: Path, style: str, role: dict
+) -> tuple[str, dict, str | None, str | None, int]:
+    """Worker: assemble -> query -> parse -> validate, with a correction loop.
+
+    On a parse/validation failure, the original prompt, the bad output, and the
+    Pydantic errors are fed back to the model asking for a fix, up to
+    MAX_CORRECTIONS times. Each failure/retry is logged. (Transient 429/timeout
+    errors are handled separately by _query_with_backoff.)
+    Returns (style, role, record_json_or_None, error_or_None, corrections_used).
+    """
+    base_prompt = assemble_prompt(version_dir, style, role)
+    label = f"{style}/{role.get('role', '?')}"
+    prompt_input: object = base_prompt
+    last_error: str | None = None
+
+    for attempt in range(MAX_CORRECTIONS + 1):  # attempt 0 = initial, 1..MAX = corrections
+        try:
+            raw = _query_with_backoff(client, prompt_input, label)
+        except Exception as exc:  # noqa: BLE001 - API error (429 exhausted, bad request): not correctable
+            return style, role, None, f"{type(exc).__name__}: {exc}", attempt
+
+        try:
+            data = stamp_metadata(extract_json(raw), style)
+            job = JobDescription.model_validate(data)
+            if attempt:
+                log.info(f"  [corrected] {label}: valid after {attempt} correction attempt(s)")
+            return style, role, job.model_dump_json(), None, attempt
+        except (ValidationError, ValueError) as exc:
+            last_error = _format_validation_error(exc)
+            if attempt == MAX_CORRECTIONS:
+                log.warning(
+                    f"  [give up] {label}: still invalid after {MAX_CORRECTIONS} correction(s) -> {last_error}"
+                )
+                return style, role, None, last_error, attempt
+            log.warning(
+                f"  [validation] {label}: attempt {attempt + 1} invalid -> {last_error}; "
+                f"requesting correction {attempt + 1}/{MAX_CORRECTIONS}"
+            )
+            prompt_input = _build_correction_prompt(base_prompt, raw, last_error)
+
+    return style, role, None, last_error, MAX_CORRECTIONS  # unreachable
 
 
 def _discover_versions() -> list[str]:
@@ -473,7 +535,7 @@ def main() -> None:
     # they complete (keeps file writes single-threaded, no lock needed).
     workers = max(1, min(args.parallel, len(plan)))
     log.info(f"\nGenerating {len(plan)} job(s) with up to {workers} parallel worker(s)...")
-    n_valid = n_invalid = 0
+    n_valid = n_invalid = n_corrected = 0
     started = time.perf_counter()
     with (
         valid_path.open("w") as vf,
@@ -484,12 +546,15 @@ def main() -> None:
             executor.submit(_generate_one, client, version_dir, style, role) for style, role in plan
         ]
         for i, future in enumerate(as_completed(futures), 1):
-            style, role, record, error = future.result()
+            style, role, record, error, corrections = future.result()
             label = f"{style}/{role.get('role', '?')}"
             if record is not None:
                 vf.write(record + "\n")
                 n_valid += 1
-                log.info(f"[{i}/{len(plan)}] OK    {label}")
+                if corrections:
+                    n_corrected += 1
+                tag = f"OK (corrected x{corrections})" if corrections else "OK"
+                log.info(f"[{i}/{len(plan)}] {tag}    {label}")
             else:
                 inf.write(json.dumps({"style": style, "role": role, "error": error}) + "\n")
                 n_invalid += 1
@@ -499,7 +564,8 @@ def main() -> None:
     per_job = elapsed / len(plan) if plan else 0.0
     rate = len(plan) / elapsed if elapsed > 0 else 0.0
     log.info(
-        f"\nDone in {elapsed:.1f}s  ({len(plan)} jobs, {per_job:.2f}s/job avg, {rate:.1f} jobs/s)  —  valid {n_valid}, invalid {n_invalid}"
+        f"\nDone in {elapsed:.1f}s  ({len(plan)} jobs, {per_job:.2f}s/job avg, {rate:.1f} jobs/s)  "
+        f"—  valid {n_valid} ({n_corrected} via correction), invalid {n_invalid}"
     )
     log.info(f"Valid:   {n_valid} -> {valid_path}")
     log.info(f"Invalid: {n_invalid} -> {invalid_path}")

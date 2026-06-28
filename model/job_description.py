@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, PositiveInt, conlist, constr, field_validator
+from pydantic import BaseModel, NonNegativeInt, conlist, constr, field_validator
 
 ExperienceLevel = constr(
     pattern=r"^(Entry|Junior|Mid|Intermediate|Senior|Lead|Principal|Executive|Director|VP)$"
@@ -33,7 +33,7 @@ class JobRequirements(BaseModel):
     required_skills: List[str]
     preferred_skills: List[str]
     education: str
-    experience_years: PositiveInt
+    experience_years: NonNegativeInt
     experience_level: ExperienceLevel
 
     @field_validator("experience_years")

@@ -202,15 +202,13 @@ def test_resume_edge_case_should_allow_current_job_without_end_date():
     assert model.experience[0].end_date is None
 
 
-def test_job_description_experience_years_zero_fails():
-    """PositiveInt requires > 0, so 0 should fail."""
+def test_job_description_experience_years_zero_allowed():
+    """NonNegativeInt allows 0 for entry-level roles."""
     payload = make_valid_job_payload()
     payload["requirements"]["experience_years"] = 0
 
-    with pytest.raises(ValidationError) as exc_info:
-        JobDescription(**payload)
-
-    assert "greater than 0" in str(exc_info.value)
+    model = JobDescription(**payload)
+    assert model.requirements.experience_years == 0
 
 
 # ============================================================================
@@ -795,7 +793,7 @@ def test_job_requirements_experience_years_negative_fails():
     with pytest.raises(ValidationError) as exc_info:
         JobDescription(**payload)
 
-    assert "greater than 0" in str(exc_info.value)
+    assert "greater than or equal to 0" in str(exc_info.value)
 
 
 def test_job_requirements_experience_years_30_boundary():

@@ -16,7 +16,7 @@ Return ONLY a single JSON object (no markdown, no code fences, no commentary) th
     "required_skills": ["<string>", "..."],
     "preferred_skills": ["<string>", "..."],
     "education": "<string>",
-    "experience_years": "<positive integer, <= 30>",
+    "experience_years": "<integer 0-30; 0 is allowed for entry-level roles>",
     "experience_level": "<one of: Entry, Junior, Mid, Intermediate, Senior, Lead, Principal, Executive, Director, VP>"
   },
   "metadata": {
@@ -33,7 +33,7 @@ Rules:
 - "description.responsibilities" must be 3-10 concrete bullet items, each 10-250 characters.
 - "summary" and "description" must reflect the requested writing Style.
 - "experience_level" must be exactly one of the allowed values listed above.
-- "experience_years" must be a positive integer and must not exceed 30.
+- "experience_years" must be an integer from 0 to 30 (0 is acceptable for entry-level roles).
 - "is_niche_role" must be a JSON boolean (true or false), not a string.
 - Classify "is_niche_role" yourself using this definition: A role MUST be classified
   as niche (true) if it requires highly specialized expertise or an uncommon professional

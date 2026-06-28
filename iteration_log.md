@@ -10,3 +10,4 @@
 | 2026-06-28 | Generator | Parallel generation via bounded thread pool with in-place 429 backoff; added --temperature and elapsed-time reporting | Sequential (~6-7 s/job) | Parallel @30 workers (~0.39 s/job; 100 jobs in 39 s) | ~16x faster | Keep |
 | 2026-06-28 | Generator | Moved niche classification from a hardcoded categories.yml flag to LLM classification per a niche definition in the output suffix | is_niche_role: hardcoded input (no detection) | is_niche_role: model-classified | detection added | Keep |
 | 2026-06-28 | Generator | Expanded role set across diverse industries to improve data-generation diversity | Roles: 8 (7 industries) | Roles: 33 (22 industries) | +25 roles, +15 industries | Keep |
+| 2026-06-28 | Generator | experience_years now allows >= 0 (was > 0); retry on Pydantic validation error for any field by feeding the error + bad output back for correction | 55/60 passing (91.7%) | 60/60 passing (100%) | +5 (+8.3%) | Keep |
