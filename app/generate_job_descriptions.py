@@ -11,12 +11,17 @@ Generation modes (which (style, role) pairs to produce):
   custom - per-style counts entered by hand, then allowed roles per style
   single - one job per selected role for a single style (the classic flow)
 
+Calls run in parallel (bounded thread pool). Rate-limit (429) errors retry in
+place with exponential backoff while the worker holds its pool slot, so an older
+in-flight request keeps its place and is not starved by newer queued submissions
+(imitates miniproject1's generate_qa_set.py).
+
 Run from the project root (or anywhere; the project root is added to sys.path):
 
     export OPENAI_API_KEY='sk-...'
     python app/generate_job_descriptions.py                       # interactive menus
-    python app/generate_job_descriptions.py --mode even --count 50
-    python app/generate_job_descriptions.py --mode random --count 30 --seed 7
+    python app/generate_job_descriptions.py --mode even --count 50 --parallel 8
+    python app/generate_job_descriptions.py --mode random --count 30 --seed 7 --temperature 0.7
     python app/generate_job_descriptions.py --mode single --style formal-corporate --limit 3
     python app/generate_job_descriptions.py --mode even --count 50 --dry-run   # plan only, no API
 
@@ -29,8 +34,10 @@ import argparse
 import json
 import random
 import sys
+import time
 import uuid
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -46,6 +53,9 @@ DEFAULT_MODEL = "gpt-4.1-mini"
 DEFAULT_VERSION = "v1"
 DEFAULT_STYLE = "formal-corporate"
 DEFAULT_COUNT = 50
+DEFAULT_PARALLEL = 8
+MAX_RETRIES = 5
+RETRY_BASE_DELAY = 2.0  # seconds; doubles on each 429 retry
 MODES = ["even", "random", "custom", "single"]
 PROMPTS_DIR = PROJECT_ROOT / "prompts" / "job_description"
 OUTPUT_BASE = PROJECT_ROOT / "data" / "job_description"
@@ -91,6 +101,42 @@ def stamp_metadata(data: dict, role: dict, style: str) -> dict:
     meta["is_niche_role"] = bool(role.get("is_niche_role", False))
     meta["writing_style"] = style
     return data
+
+
+def _generate_one(client: MyOpenAIClient, version_dir: Path, style: str, role: dict) -> tuple[str, dict, str | None, str | None]:
+    """Worker: assemble -> query -> parse -> validate, returning a record or error.
+
+    On a rate-limit (429), retries in place with exponential backoff while still
+    holding this worker's pool slot. That keeps an older in-flight request in its
+    place rather than letting newer queued submissions jump ahead and starve it.
+    Returns (style, role, record_json_or_None, error_or_None).
+    """
+    try:
+        from openai import APITimeoutError, RateLimitError
+        retryable: tuple = (RateLimitError, APITimeoutError)
+    except ImportError:  # pragma: no cover - openai always present at runtime
+        from openai import RateLimitError
+        retryable = (RateLimitError,)
+
+    prompt = assemble_prompt(version_dir, style, role)
+    label = f"{style}/{role.get('role', '?')}"
+    delay = RETRY_BASE_DELAY
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            response = client.query(input=prompt)
+            raw = getattr(response, "output_text", None) or str(response)
+            data = stamp_metadata(extract_json(raw), role, style)
+            job = JobDescription.model_validate(data)
+            return style, role, job.model_dump_json(), None
+        except retryable as exc:
+            if attempt == MAX_RETRIES:
+                return style, role, None, f"{type(exc).__name__}: {exc}"
+            print(f"  [rate limit] {label}: attempt {attempt}/{MAX_RETRIES}, retrying in {delay:.1f}s...")
+            time.sleep(delay)
+            delay *= 2
+        except Exception as exc:  # noqa: BLE001 - non-retryable (parse/validation): record and move on
+            return style, role, None, f"{type(exc).__name__}: {exc}"
+    return style, role, None, "exhausted retries"
 
 
 def _discover_versions() -> list[str]:
@@ -287,6 +333,8 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=None, help="single mode: max roles (skips the role menu)")
     parser.add_argument("--seed", type=int, default=None, help="random mode: RNG seed for reproducibility")
     parser.add_argument("--model", default=None, help=f"Model (menu if omitted; default: {DEFAULT_MODEL})")
+    parser.add_argument("--temperature", type=float, default=None, help="Sampling temperature; omit to leave unset (server default ~1.0)")
+    parser.add_argument("--parallel", type=int, default=DEFAULT_PARALLEL, help=f"Max parallel API calls (default: {DEFAULT_PARALLEL}; use 1 for sequential)")
     parser.add_argument("--dry-run", action="store_true", help="Build the plan only; no API calls or files written")
     args = parser.parse_args()
 
@@ -303,7 +351,8 @@ def main() -> None:
     if not plan:
         sys.exit("Empty plan: nothing to generate.")
 
-    print(f"\nVersion: {version} | mode: {mode} | model: {model}")
+    temp_label = "unset" if args.temperature is None else args.temperature
+    print(f"\nVersion: {version} | mode: {mode} | model: {model} | temp: {temp_label} | parallel: {args.parallel}")
     summarize_plan(plan)
 
     if args.dry_run:
@@ -313,8 +362,9 @@ def main() -> None:
         print(sample)
         return
 
-    client = MyOpenAIClient(model=model)
+    client = MyOpenAIClient(model=model, temperature=args.temperature)
     client.validate_api_key()
+    client.get_client()  # initialize the shared client once before threads use it
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_dir = OUTPUT_BASE / version
@@ -322,25 +372,32 @@ def main() -> None:
     valid_path = out_dir / f"jobs_{timestamp}.jsonl"
     invalid_path = out_dir / f"invalid_{timestamp}.jsonl"
 
+    # Submit the whole plan to a bounded pool; workers retry 429s in place so older
+    # in-flight requests keep their slot. Results are written from this thread as
+    # they complete (keeps file writes single-threaded, no lock needed).
+    workers = max(1, min(args.parallel, len(plan)))
+    print(f"\nGenerating {len(plan)} job(s) with up to {workers} parallel worker(s)...")
     n_valid = n_invalid = 0
-    with valid_path.open("w") as vf, invalid_path.open("w") as inf:
-        for i, (style, role) in enumerate(plan, 1):
-            label = f"{style}/{role.get('role', f'role_{i}')}"
-            try:
-                prompt = assemble_prompt(version_dir, style, role)
-                response = client.query(input=prompt)
-                raw = getattr(response, "output_text", None) or str(response)
-                data = stamp_metadata(extract_json(raw), role, style)
-                job = JobDescription.model_validate(data)
-                vf.write(job.model_dump_json() + "\n")
+    started = time.perf_counter()
+    with valid_path.open("w") as vf, invalid_path.open("w") as inf, ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(_generate_one, client, version_dir, style, role) for style, role in plan]
+        for i, future in enumerate(as_completed(futures), 1):
+            style, role, record, error = future.result()
+            label = f"{style}/{role.get('role', '?')}"
+            if record is not None:
+                vf.write(record + "\n")
                 n_valid += 1
                 print(f"[{i}/{len(plan)}] OK    {label}")
-            except Exception as exc:  # noqa: BLE001 - record and continue
-                inf.write(json.dumps({"style": style, "role": role, "error": f"{type(exc).__name__}: {exc}"}) + "\n")
+            else:
+                inf.write(json.dumps({"style": style, "role": role, "error": error}) + "\n")
                 n_invalid += 1
-                print(f"[{i}/{len(plan)}] FAIL  {label} -> {type(exc).__name__}: {exc}")
+                print(f"[{i}/{len(plan)}] FAIL  {label} -> {error}")
 
-    print(f"\nValid:   {n_valid} -> {valid_path}")
+    elapsed = time.perf_counter() - started
+    per_job = elapsed / len(plan) if plan else 0.0
+    rate = len(plan) / elapsed if elapsed > 0 else 0.0
+    print(f"\nDone in {elapsed:.1f}s  ({len(plan)} jobs, {per_job:.2f}s/job avg, {rate:.1f} jobs/s)  —  valid {n_valid}, invalid {n_invalid}")
+    print(f"Valid:   {n_valid} -> {valid_path}")
     print(f"Invalid: {n_invalid} -> {invalid_path}")
 
 
