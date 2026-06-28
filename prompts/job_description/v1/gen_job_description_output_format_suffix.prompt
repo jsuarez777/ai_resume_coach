@@ -7,6 +7,11 @@ Return ONLY a single JSON object (no markdown, no code fences, no commentary) th
     "size": "<string, e.g. '51-200 employees'>",
     "location": "<string, e.g. 'Austin, TX'>"
   },
+  "summary": "<2-3 sentence overview of the role, 80-400 characters>",
+  "description": {
+    "overview": "<one paragraph describing the core of the job, 150-1200 characters>",
+    "responsibilities": ["<responsibility bullet, 10-250 chars>", "..."]
+  },
   "requirements": {
     "required_skills": ["<string>", "..."],
     "preferred_skills": ["<string>", "..."],
@@ -23,6 +28,10 @@ Return ONLY a single JSON object (no markdown, no code fences, no commentary) th
 
 Rules:
 - Output must be valid JSON that parses directly into the JobDescription model.
+- "summary" must be 2-3 sentences, between 80 and 400 characters.
+- "description.overview" must be a single paragraph between 150 and 1200 characters.
+- "description.responsibilities" must be 3-10 concrete bullet items, each 10-250 characters.
+- "summary" and "description" must reflect the requested writing Style.
 - "experience_level" must be exactly one of the allowed values listed above.
 - "experience_years" must be a positive integer and must not exceed 30.
 - "is_niche_role" must be a JSON boolean (true or false), not a string.

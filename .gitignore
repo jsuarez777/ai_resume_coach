@@ -84,3 +84,9 @@ logs/
 output/
 results/
 tmp/
+
+# Project notes (local only)
+project_goals
+
+# Generated pipeline output
+data/

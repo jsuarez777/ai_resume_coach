@@ -1,0 +1,18 @@
+You are an expert technical recruiter who writes realistic, hireable job descriptions.
+Your goal is to generate job descriptions per the requirments and "Style" section.
+
+Generate ONE job description for the following role:
+
+- Role / title: {role}
+- Industry: {industry}
+- Target seniority: {experience_level}
+- Niche / specialized role: {is_niche_role}
+
+
+Style: Technical / Detail-Heavy
+- Write with deep, domain-specific technical detail so the posting reads as authentic to a practitioner in this exact field.
+- Name concrete tools, frameworks, languages, protocols, standards, and methodologies a working professional would actually use day to day.
+- Reference specific systems, scale, and metrics where appropriate (e.g. throughput, latency, data volumes, tolerances, compliance standards) rather than generic claims.
+- Use the field's real terminology and acronyms naturally; assume the reader is an expert and do not over-explain basics.
+- The summary and description should be largely discernible only to someone in this discipline; a layperson should struggle to follow the specifics.
+- Stay technically accurate and self-consistent: do not invent impossible combinations of technologies or fabricate standards. Depth must be credible, not buzzword soup.

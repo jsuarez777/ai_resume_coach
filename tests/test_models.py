@@ -69,6 +69,24 @@ def make_valid_job_payload():
             "size": "100-250",
             "location": "Austin, TX",
         },
+        "summary": (
+            "Acme Corp is hiring a Mid-level engineer to build and maintain our core "
+            "backend services. You'll work across the stack with a small, collaborative "
+            "team and ship features that reach customers quickly."
+        ),
+        "description": {
+            "overview": (
+                "As a backend engineer at Acme Corp, you will design, build, and operate "
+                "the APIs and data pipelines that power our platform. You'll collaborate "
+                "closely with product and design to turn requirements into reliable, "
+                "well-tested services, and help shape our engineering practices as we grow."
+            ),
+            "responsibilities": [
+                "Design and implement RESTful APIs using Python and FastAPI",
+                "Write automated unit and integration tests for new features",
+                "Collaborate with product managers to scope and deliver projects",
+            ],
+        },
         "requirements": {
             "required_skills": ["Python", "FastAPI"],
             "preferred_skills": ["Docker", "Kubernetes"],

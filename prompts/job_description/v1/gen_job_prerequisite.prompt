@@ -1,5 +1,7 @@
 General Guidelines:
 - Invent a plausible, specific company (name, industry, size, location). Do NOT use real company names.
+- summary: a 2-3 sentence high-level overview of the role written in the requested Style.
+- description.overview: one paragraph describing the core of the job; description.responsibilities: 3-10 concrete day-to-day responsibilities.
 - required_skills: 4-8 concrete, role-appropriate skills that are genuinely necessary for this role.
 - preferred_skills: 2-5 nice-to-have skills, distinct from required_skills.
 - education: a realistic requirement (e.g., "Bachelor's degree in Computer Science or equivalent experience").

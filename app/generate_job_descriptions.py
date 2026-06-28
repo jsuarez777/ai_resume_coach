@@ -37,7 +37,7 @@ DEFAULT_MODEL = "gpt-4.1-mini"
 DEFAULT_VERSION = "v1"
 DEFAULT_STYLE = "formal-corporate"
 PROMPTS_DIR = PROJECT_ROOT / "prompts" / "job_description"
-OUTPUT_DIR = PROJECT_ROOT / "data" / "job_description"
+OUTPUT_BASE = PROJECT_ROOT / "data" / "job_description"
 
 
 def _read(path: Path) -> str:
@@ -209,9 +209,10 @@ def main() -> None:
     client.validate_api_key()
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    valid_path = OUTPUT_DIR / f"jobs_{timestamp}.jsonl"
-    invalid_path = OUTPUT_DIR / f"invalid_{timestamp}.jsonl"
+    out_dir = OUTPUT_BASE / version
+    out_dir.mkdir(parents=True, exist_ok=True)
+    valid_path = out_dir / f"jobs_{timestamp}.jsonl"
+    invalid_path = out_dir / f"invalid_{timestamp}.jsonl"
 
     n_valid = n_invalid = 0
     with valid_path.open("w") as vf, invalid_path.open("w") as inf:
