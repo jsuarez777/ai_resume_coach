@@ -1,5 +1,5 @@
 from .openai_client import MyOpenAIClient, load_env_var_from_profile
-from .pricing import PRICES, cost_usd, cost_summary
+from .pricing import PRICES, cost_summary, cost_usd
 
 __all__ = [
     "MyOpenAIClient",

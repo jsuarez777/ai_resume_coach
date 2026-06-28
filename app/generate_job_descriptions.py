@@ -28,6 +28,7 @@ Run from the project root (or anywhere; the project root is added to sys.path):
 Any selection passed as a flag skips its menu; omitted selections prompt a menu
 when run on a TTY, and fall back to defaults when piped/non-interactive.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -47,7 +48,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from model.job_description import JobDescription  # noqa: E402
-from openai_client import MyOpenAIClient, PRICES  # noqa: E402
+from openai_client import PRICES, MyOpenAIClient  # noqa: E402
 
 DEFAULT_MODEL = "gpt-4.1-mini"
 DEFAULT_VERSION = "v1"
@@ -103,7 +104,9 @@ def stamp_metadata(data: dict, role: dict, style: str) -> dict:
     return data
 
 
-def _generate_one(client: MyOpenAIClient, version_dir: Path, style: str, role: dict) -> tuple[str, dict, str | None, str | None]:
+def _generate_one(
+    client: MyOpenAIClient, version_dir: Path, style: str, role: dict
+) -> tuple[str, dict, str | None, str | None]:
     """Worker: assemble -> query -> parse -> validate, returning a record or error.
 
     On a rate-limit (429), retries in place with exponential backoff while still
@@ -113,9 +116,11 @@ def _generate_one(client: MyOpenAIClient, version_dir: Path, style: str, role: d
     """
     try:
         from openai import APITimeoutError, RateLimitError
+
         retryable: tuple = (RateLimitError, APITimeoutError)
     except ImportError:  # pragma: no cover - openai always present at runtime
         from openai import RateLimitError
+
         retryable = (RateLimitError,)
 
     prompt = assemble_prompt(version_dir, style, role)
@@ -131,7 +136,9 @@ def _generate_one(client: MyOpenAIClient, version_dir: Path, style: str, role: d
         except retryable as exc:
             if attempt == MAX_RETRIES:
                 return style, role, None, f"{type(exc).__name__}: {exc}"
-            print(f"  [rate limit] {label}: attempt {attempt}/{MAX_RETRIES}, retrying in {delay:.1f}s...")
+            print(
+                f"  [rate limit] {label}: attempt {attempt}/{MAX_RETRIES}, retrying in {delay:.1f}s..."
+            )
             time.sleep(delay)
             delay *= 2
         except Exception as exc:  # noqa: BLE001 - non-retryable (parse/validation): record and move on
@@ -145,7 +152,9 @@ def _discover_versions() -> list[str]:
 
 def _discover_styles(version_dir: Path) -> list[str]:
     prefix, suffix = "gen_job_", ".template"
-    return sorted(p.name[len(prefix):-len(suffix)] for p in version_dir.glob(f"{prefix}*{suffix}"))
+    return sorted(
+        p.name[len(prefix) : -len(suffix)] for p in version_dir.glob(f"{prefix}*{suffix}")
+    )
 
 
 def _interactive() -> bool:
@@ -178,7 +187,9 @@ def _pick_model(prices: dict, default: str) -> str:
     width = max(len(m) for m in models)
     print("\nModel (cost [ in / out per 1MM tok]:")
     for i, m in enumerate(models, 1):
-        print(f"  {i}. {m:<{width}}  {_fmt_price(prices[m])}{'  (default)' if m == default else ''}")
+        print(
+            f"  {i}. {m:<{width}}  {_fmt_price(prices[m])}{'  (default)' if m == default else ''}"
+        )
     while True:
         raw = input(f"Select 1-{len(models)} [default: {default}]: ").strip()
         if not raw:
@@ -200,7 +211,11 @@ def _pick_roles(roles: list[dict]) -> list[dict]:
         return [roles[0]]
     if raw.lower() == "all":
         return roles
-    chosen = [roles[int(t) - 1] for t in raw.split(",") if t.strip().isdigit() and 1 <= int(t) <= len(roles)]
+    chosen = [
+        roles[int(t) - 1]
+        for t in raw.split(",")
+        if t.strip().isdigit() and 1 <= int(t) <= len(roles)
+    ]
     return chosen or [roles[0]]
 
 
@@ -222,7 +237,11 @@ def _pick_roles_allow(roles: list[dict], style: str) -> list[dict]:
     raw = input(f"Select roles (comma-separated 1-{len(roles)}, or 'all') [default: all]: ").strip()
     if not raw or raw.lower() == "all":
         return roles
-    chosen = [roles[int(t) - 1] for t in raw.split(",") if t.strip().isdigit() and 1 <= int(t) <= len(roles)]
+    chosen = [
+        roles[int(t) - 1]
+        for t in raw.split(",")
+        if t.strip().isdigit() and 1 <= int(t) <= len(roles)
+    ]
     return chosen or roles
 
 
@@ -243,7 +262,9 @@ def build_plan_even(styles: list[str], roles: list[dict], total: int) -> list[tu
     return plan
 
 
-def build_plan_random(styles: list[str], roles: list[dict], total: int, rng: random.Random) -> list[tuple[str, dict]]:
+def build_plan_random(
+    styles: list[str], roles: list[dict], total: int, rng: random.Random
+) -> list[tuple[str, dict]]:
     return [(rng.choice(styles), rng.choice(roles)) for _ in range(total)]
 
 
@@ -266,8 +287,16 @@ def resolve_version(args: argparse.Namespace) -> str:
     if args.version:
         return args.version
     if _interactive() and len(versions) > 1:
-        return _pick_one("Prompt version:", versions, DEFAULT_VERSION if DEFAULT_VERSION in versions else versions[0])
-    return DEFAULT_VERSION if DEFAULT_VERSION in versions else (versions[0] if versions else DEFAULT_VERSION)
+        return _pick_one(
+            "Prompt version:",
+            versions,
+            DEFAULT_VERSION if DEFAULT_VERSION in versions else versions[0],
+        )
+    return (
+        DEFAULT_VERSION
+        if DEFAULT_VERSION in versions
+        else (versions[0] if versions else DEFAULT_VERSION)
+    )
 
 
 def resolve_model(args: argparse.Namespace) -> str:
@@ -278,13 +307,19 @@ def resolve_model(args: argparse.Namespace) -> str:
     return DEFAULT_MODEL
 
 
-def resolve_plan(args: argparse.Namespace, styles: list[str], roles: list[dict]) -> tuple[str, list[tuple[str, dict]]]:
+def resolve_plan(
+    args: argparse.Namespace, styles: list[str], roles: list[dict]
+) -> tuple[str, list[tuple[str, dict]]]:
     """Resolve the generation mode and build the (style, role) plan."""
     interactive = _interactive()
 
     mode = args.mode
     if not mode:
-        mode = _pick_one("Generation mode:", MODES, "even") if interactive else ("single" if args.style else "even")
+        mode = (
+            _pick_one("Generation mode:", MODES, "even")
+            if interactive
+            else ("single" if args.style else "even")
+        )
 
     if mode == "single":
         if args.style:
@@ -303,11 +338,19 @@ def resolve_plan(args: argparse.Namespace, styles: list[str], roles: list[dict])
 
     if mode == "custom":
         if not interactive:
-            sys.exit("custom mode requires an interactive terminal (use --mode even/random with --count for scripting).")
+            sys.exit(
+                "custom mode requires an interactive terminal (use --mode even/random with --count for scripting)."
+            )
         return mode, build_plan_custom(styles, roles)
 
     # even / random need a total count
-    total = args.count if args.count is not None else (_ask_int("How many jobs?", DEFAULT_COUNT, minimum=1) if interactive else DEFAULT_COUNT)
+    total = (
+        args.count
+        if args.count is not None
+        else (
+            _ask_int("How many jobs?", DEFAULT_COUNT, minimum=1) if interactive else DEFAULT_COUNT
+        )
+    )
     if mode == "even":
         return mode, build_plan_even(styles, roles, total)
     if mode == "random":
@@ -326,16 +369,42 @@ def summarize_plan(plan: list[tuple[str, dict]]) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", default=None, help="Prompt version folder (menu if omitted; default: v1)")
-    parser.add_argument("--mode", default=None, choices=MODES, help="Generation mode (menu if omitted)")
-    parser.add_argument("--count", type=int, default=None, help="Total jobs for even/random mode (default: 50)")
-    parser.add_argument("--style", default=None, help="Template style for single mode (menu if omitted)")
-    parser.add_argument("--limit", type=int, default=None, help="single mode: max roles (skips the role menu)")
-    parser.add_argument("--seed", type=int, default=None, help="random mode: RNG seed for reproducibility")
-    parser.add_argument("--model", default=None, help=f"Model (menu if omitted; default: {DEFAULT_MODEL})")
-    parser.add_argument("--temperature", type=float, default=None, help="Sampling temperature; omit to leave unset (server default ~1.0)")
-    parser.add_argument("--parallel", type=int, default=DEFAULT_PARALLEL, help=f"Max parallel API calls (default: {DEFAULT_PARALLEL}; use 1 for sequential)")
-    parser.add_argument("--dry-run", action="store_true", help="Build the plan only; no API calls or files written")
+    parser.add_argument(
+        "--version", default=None, help="Prompt version folder (menu if omitted; default: v1)"
+    )
+    parser.add_argument(
+        "--mode", default=None, choices=MODES, help="Generation mode (menu if omitted)"
+    )
+    parser.add_argument(
+        "--count", type=int, default=None, help="Total jobs for even/random mode (default: 50)"
+    )
+    parser.add_argument(
+        "--style", default=None, help="Template style for single mode (menu if omitted)"
+    )
+    parser.add_argument(
+        "--limit", type=int, default=None, help="single mode: max roles (skips the role menu)"
+    )
+    parser.add_argument(
+        "--seed", type=int, default=None, help="random mode: RNG seed for reproducibility"
+    )
+    parser.add_argument(
+        "--model", default=None, help=f"Model (menu if omitted; default: {DEFAULT_MODEL})"
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=None,
+        help="Sampling temperature; omit to leave unset (server default ~1.0)",
+    )
+    parser.add_argument(
+        "--parallel",
+        type=int,
+        default=DEFAULT_PARALLEL,
+        help=f"Max parallel API calls (default: {DEFAULT_PARALLEL}; use 1 for sequential)",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Build the plan only; no API calls or files written"
+    )
     args = parser.parse_args()
 
     version = resolve_version(args)
@@ -352,7 +421,9 @@ def main() -> None:
         sys.exit("Empty plan: nothing to generate.")
 
     temp_label = "unset" if args.temperature is None else args.temperature
-    print(f"\nVersion: {version} | mode: {mode} | model: {model} | temp: {temp_label} | parallel: {args.parallel}")
+    print(
+        f"\nVersion: {version} | mode: {mode} | model: {model} | temp: {temp_label} | parallel: {args.parallel}"
+    )
     summarize_plan(plan)
 
     if args.dry_run:
@@ -379,8 +450,14 @@ def main() -> None:
     print(f"\nGenerating {len(plan)} job(s) with up to {workers} parallel worker(s)...")
     n_valid = n_invalid = 0
     started = time.perf_counter()
-    with valid_path.open("w") as vf, invalid_path.open("w") as inf, ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = [executor.submit(_generate_one, client, version_dir, style, role) for style, role in plan]
+    with (
+        valid_path.open("w") as vf,
+        invalid_path.open("w") as inf,
+        ThreadPoolExecutor(max_workers=workers) as executor,
+    ):
+        futures = [
+            executor.submit(_generate_one, client, version_dir, style, role) for style, role in plan
+        ]
         for i, future in enumerate(as_completed(futures), 1):
             style, role, record, error = future.result()
             label = f"{style}/{role.get('role', '?')}"
@@ -396,7 +473,9 @@ def main() -> None:
     elapsed = time.perf_counter() - started
     per_job = elapsed / len(plan) if plan else 0.0
     rate = len(plan) / elapsed if elapsed > 0 else 0.0
-    print(f"\nDone in {elapsed:.1f}s  ({len(plan)} jobs, {per_job:.2f}s/job avg, {rate:.1f} jobs/s)  —  valid {n_valid}, invalid {n_invalid}")
+    print(
+        f"\nDone in {elapsed:.1f}s  ({len(plan)} jobs, {per_job:.2f}s/job avg, {rate:.1f} jobs/s)  —  valid {n_valid}, invalid {n_invalid}"
+    )
     print(f"Valid:   {n_valid} -> {valid_path}")
     print(f"Invalid: {n_invalid} -> {invalid_path}")
 

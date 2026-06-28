@@ -1,20 +1,11 @@
 import pytest
-from datetime import date, datetime, timedelta
 from pydantic import ValidationError
 
-from model.resume import (
-    ContactInfo,
-    EducationEntry,
-    ExperienceEntry,
-    Resume,
-    ResumeMetadata,
-    Skill,
-)
 from model.job_description import (
-    CompanyInfo,
     JobDescription,
-    JobMetadata,
-    JobRequirements,
+)
+from model.resume import (
+    Resume,
 )
 
 
@@ -818,7 +809,18 @@ def test_job_requirements_experience_years_30_boundary():
 
 def test_job_requirements_all_experience_levels():
     """Test all valid experience_level values."""
-    valid_levels = ["Entry", "Junior", "Mid", "Intermediate", "Senior", "Lead", "Principal", "Executive", "Director", "VP"]
+    valid_levels = [
+        "Entry",
+        "Junior",
+        "Mid",
+        "Intermediate",
+        "Senior",
+        "Lead",
+        "Principal",
+        "Executive",
+        "Director",
+        "VP",
+    ]
 
     for level in valid_levels:
         payload = make_valid_job_payload()

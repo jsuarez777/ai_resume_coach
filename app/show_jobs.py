@@ -11,6 +11,7 @@ Run from the project root (or anywhere):
     python app/show_jobs.py
     python app/show_jobs.py --version v1 --file jobs_20260627_205222.jsonl
 """
+
 from __future__ import annotations
 
 import argparse
@@ -74,7 +75,7 @@ def _fmt_job(idx: int, rec: dict) -> str:
     style = meta.get("writing_style") or "—"
     seniority = f"{req.get('experience_level', '?')} ({req.get('experience_years', '?')} yrs)"
     trace = (meta.get("trace_id") or "")[:8]
-    generated = (meta.get("generated_at") or "")
+    generated = meta.get("generated_at") or ""
 
     details = rec.get("description", {})
     overview = details.get("overview", "")
@@ -103,8 +104,16 @@ def _fmt_job(idx: int, rec: dict) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", default=None, help="version subdir under data/job_description/ (menu if omitted)")
-    parser.add_argument("--file", default=None, help="jobs_*.jsonl filename within the version dir (menu if omitted)")
+    parser.add_argument(
+        "--version",
+        default=None,
+        help="version subdir under data/job_description/ (menu if omitted)",
+    )
+    parser.add_argument(
+        "--file",
+        default=None,
+        help="jobs_*.jsonl filename within the version dir (menu if omitted)",
+    )
     args = parser.parse_args()
 
     if not JOBS_DIR.is_dir():

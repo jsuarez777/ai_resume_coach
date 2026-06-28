@@ -4,6 +4,7 @@ Looks for pricing_<MMDDYYYY>.csv files; falls back to pricing.csv (treated as ol
 CSV columns: model, input_per_1m, cached_input_per_1m, output_per_1m  (USD per 1M tokens)
 Empty cached_input_per_1m means caching is not available for that model.
 """
+
 import csv
 import re
 from datetime import date
@@ -63,9 +64,7 @@ def cost_usd(
     p = PRICES[model]
     cached_rate = p["cached_input"] if p["cached_input"] is not None else p["input"]
     return (
-        input_tokens * p["input"]
-        + cached_input_tokens * cached_rate
-        + output_tokens * p["output"]
+        input_tokens * p["input"] + cached_input_tokens * cached_rate + output_tokens * p["output"]
     ) / 1_000_000
 
 

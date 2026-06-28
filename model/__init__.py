@@ -1,5 +1,5 @@
-from .job_description import JobDescription, JobDetails, JobMetadata, JobRequirements, CompanyInfo
-from .resume import Resume, ResumeMetadata, ContactInfo, EducationEntry, ExperienceEntry, Skill
+from .job_description import CompanyInfo, JobDescription, JobDetails, JobMetadata, JobRequirements
+from .resume import ContactInfo, EducationEntry, ExperienceEntry, Resume, ResumeMetadata, Skill
 
 __all__ = [
     "JobDescription",

@@ -5,7 +5,9 @@ from typing import List, Optional
 
 from pydantic import BaseModel, PositiveInt, conlist, constr, field_validator
 
-ExperienceLevel = constr(pattern=r"^(Entry|Junior|Mid|Intermediate|Senior|Lead|Principal|Executive|Director|VP)$")
+ExperienceLevel = constr(
+    pattern=r"^(Entry|Junior|Mid|Intermediate|Senior|Lead|Principal|Executive|Director|VP)$"
+)
 
 # Free-text length bounds (characters).
 SummaryText = constr(strip_whitespace=True, min_length=80, max_length=400)
