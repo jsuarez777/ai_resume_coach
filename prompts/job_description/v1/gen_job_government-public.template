@@ -6,7 +6,6 @@ Generate ONE job description for the following role:
 - Role / title: {role}
 - Industry: {industry}
 - Target seniority: {experience_level}
-- Niche / specialized role: {is_niche_role}
 
 Style: Government / Public Sector
 - Write as a government or public-sector agency posting (municipal, state, federal, or a public institution such as a university or transit authority).

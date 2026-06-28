@@ -93,12 +93,14 @@ def _fmt_job(idx: int, rec: dict) -> str:
     if responsibilities:
         lines.append("    Responsibilities:")
         lines.extend(f"      • {r}" for r in responsibilities)
-    lines += [
-        f"    Education : {req.get('education', '?')}",
-        f"    Required  : {', '.join(req.get('required_skills', [])) or '—'}",
-        f"    Preferred : {', '.join(req.get('preferred_skills', [])) or '—'}",
-        f"    trace_id  : {trace}…  ·  generated {generated}",
-    ]
+    lines.append(f"    Education : {req.get('education', '?')}")
+    required = req.get("required_skills", [])
+    preferred = req.get("preferred_skills", [])
+    lines.append("    Required  :" if required else "    Required  : —")
+    lines.extend(f"      • {s}" for s in required)
+    lines.append("    Preferred :" if preferred else "    Preferred : —")
+    lines.extend(f"      • {s}" for s in preferred)
+    lines.append(f"    trace_id  : {trace}…  ·  generated {generated}")
     return "\n".join(lines)
 
 

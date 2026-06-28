@@ -1,37 +1,129 @@
 # Role archetypes for job-description generation.
-# Each entry is fed into gen_job_description.template via str.format_map,
-# then the gen_job_description_output_format_suffix.prompt is appended.
-# Include a mix of common and niche roles to exercise the is_niche_role path.
+# Each entry is fed into gen_job_*.template via str.format_map, then the
+# gen_job_description_output_format_suffix.prompt is appended.
+# Niche-vs-standard is NOT specified here: the model classifies is_niche_role
+# itself per the niche definition in the output-format suffix prompt.
 roles:
   - role: "Software Engineer"
     industry: "Technology"
     experience_level: "Mid"
-    is_niche_role: false
   - role: "Senior Backend Engineer"
     industry: "Fintech"
     experience_level: "Senior"
-    is_niche_role: false
   - role: "Data Scientist"
     industry: "Healthcare"
     experience_level: "Mid"
-    is_niche_role: false
   - role: "Product Manager"
     industry: "E-commerce"
     experience_level: "Senior"
-    is_niche_role: false
   - role: "DevOps / Platform Engineer"
     industry: "Technology"
     experience_level: "Senior"
-    is_niche_role: false
   - role: "Embedded Firmware Engineer (RTOS)"
     industry: "Aerospace"
     experience_level: "Senior"
-    is_niche_role: true
   - role: "Quantitative Researcher"
     industry: "Hedge Fund"
     experience_level: "Principal"
-    is_niche_role: true
   - role: "Bioinformatics Scientist"
     industry: "Genomics"
     experience_level: "Lead"
-    is_niche_role: true
+
+  # Food Service / Hospitality
+  - role: "Waiter / Waitress"
+    industry: "Food Service"
+    experience_level: "Entry"
+  - role: "Maître d'"
+    industry: "Fine Dining"
+    experience_level: "Senior"
+
+  # Sanitation
+  - role: "Janitor"
+    industry: "Sanitation"
+    experience_level: "Entry"
+  - role: "Asbestos / Mold Remediation Technician"
+    industry: "Sanitation"
+    experience_level: "Mid"
+  - role: "Biohazard Cleaning Specialist"
+    industry: "Sanitation"
+    experience_level: "Mid"
+
+  # Construction & Trades
+  - role: "Carpenter"
+    industry: "Construction"
+    experience_level: "Mid"
+  - role: "Underwater / Structural Welder"
+    industry: "Construction"
+    experience_level: "Senior"
+
+  # Agriculture
+  - role: "Farm Laborer"
+    industry: "Agriculture"
+    experience_level: "Entry"
+  - role: "Precision-Agriculture Drone Operator"
+    industry: "Agriculture"
+    experience_level: "Mid"
+
+  # Automotive Repair
+  - role: "Auto Mechanic"
+    industry: "Automotive"
+    experience_level: "Mid"
+  - role: "EV High-Voltage Battery Technician"
+    industry: "Automotive"
+    experience_level: "Senior"
+
+  # Logistics & Warehousing
+  - role: "Warehouse Associate"
+    industry: "Logistics"
+    experience_level: "Entry"
+  - role: "Cold-Chain Logistics Coordinator"
+    industry: "Logistics"
+    experience_level: "Mid"
+
+  # Energy & Utilities
+  - role: "Electrical Lineman"
+    industry: "Utilities"
+    experience_level: "Mid"
+  - role: "Wind Turbine Technician"
+    industry: "Renewable Energy"
+    experience_level: "Senior"
+
+  # Maritime & Offshore
+  - role: "Deckhand"
+    industry: "Maritime"
+    experience_level: "Entry"
+  - role: "Commercial Saturation Diver"
+    industry: "Offshore Oil & Gas"
+    experience_level: "Senior"
+
+  # Funeral / Death Care
+  - role: "Funeral Attendant"
+    industry: "Death Care"
+    experience_level: "Entry"
+  - role: "Embalmer"
+    industry: "Death Care"
+    experience_level: "Senior"
+
+  # Veterinary & Animal Care
+  - role: "Veterinary Assistant"
+    industry: "Veterinary"
+    experience_level: "Entry"
+  - role: "Equine Dental Technician"
+    industry: "Veterinary"
+    experience_level: "Senior"
+
+  # Beauty & Personal Care
+  - role: "Hair Stylist"
+    industry: "Personal Care"
+    experience_level: "Mid"
+  - role: "Electrologist"
+    industry: "Personal Care"
+    experience_level: "Senior"
+
+  # Mining & Extraction
+  - role: "Heavy Equipment Operator"
+    industry: "Mining"
+    experience_level: "Mid"
+  - role: "Underground Blasting / Explosives Technician"
+    industry: "Mining"
+    experience_level: "Senior"

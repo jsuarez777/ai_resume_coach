@@ -90,3 +90,6 @@ project_goals
 
 # Generated pipeline output
 data/
+
+# Run logs
+logs/

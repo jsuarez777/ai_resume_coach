@@ -6,7 +6,6 @@ Generate ONE job description for the following role:
 - Role / title: {role}
 - Industry: {industry}
 - Target seniority: {experience_level}
-- Niche / specialized role: {is_niche_role}
 
 
 Style: Technical / Detail-Heavy

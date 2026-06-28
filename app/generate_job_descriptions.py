@@ -33,6 +33,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
+import os
 import random
 import sys
 import time
@@ -60,6 +62,24 @@ RETRY_BASE_DELAY = 2.0  # seconds; doubles on each 429 retry
 MODES = ["even", "random", "custom", "single"]
 PROMPTS_DIR = PROJECT_ROOT / "prompts" / "job_description"
 OUTPUT_BASE = PROJECT_ROOT / "data" / "job_description"
+LOGS_DIR = PROJECT_ROOT / "logs"
+
+log = logging.getLogger(__name__)
+
+
+def _setup_logging(to_file: bool) -> Path | None:
+    """Log to stdout (and a timestamped file unless dry-run), mp1-style."""
+    handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]
+    log_file = None
+    if to_file:
+        LOGS_DIR.mkdir(parents=True, exist_ok=True)
+        log_file = LOGS_DIR / f"{time.strftime('%Y%m%d_%H%M%S')}_generate_job_descriptions.log"
+        handlers.append(logging.FileHandler(log_file))
+    logging.basicConfig(level=logging.INFO, format="%(message)s", handlers=handlers)
+    if os.getenv("LOG_HTTP") != "1":
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        logging.getLogger("openai").setLevel(logging.WARNING)
+    return log_file
 
 
 def _read(path: Path) -> str:
@@ -91,15 +111,15 @@ def extract_json(text: str) -> dict:
     return json.loads(text[start : end + 1])
 
 
-def stamp_metadata(data: dict, role: dict, style: str) -> dict:
-    """The pipeline owns trace_id/generated_at/writing_style; is_niche_role from input."""
+def stamp_metadata(data: dict, style: str) -> dict:
+    """The pipeline owns trace_id/generated_at/writing_style. is_niche_role is left as
+    the model classified it (per the niche definition in the output-format suffix)."""
     meta = data.get("metadata")
     if not isinstance(meta, dict):
         meta = {}
         data["metadata"] = meta
     meta["trace_id"] = str(uuid.uuid4())
     meta["generated_at"] = datetime.now(timezone.utc).isoformat()
-    meta["is_niche_role"] = bool(role.get("is_niche_role", False))
     meta["writing_style"] = style
     return data
 
@@ -130,13 +150,13 @@ def _generate_one(
         try:
             response = client.query(input=prompt)
             raw = getattr(response, "output_text", None) or str(response)
-            data = stamp_metadata(extract_json(raw), role, style)
+            data = stamp_metadata(extract_json(raw), style)
             job = JobDescription.model_validate(data)
             return style, role, job.model_dump_json(), None
         except retryable as exc:
             if attempt == MAX_RETRIES:
                 return style, role, None, f"{type(exc).__name__}: {exc}"
-            print(
+            log.warning(
                 f"  [rate limit] {label}: attempt {attempt}/{MAX_RETRIES}, retrying in {delay:.1f}s..."
             )
             time.sleep(delay)
@@ -205,7 +225,7 @@ def _pick_roles(roles: list[dict]) -> list[dict]:
     """Multi-choice menu over categories.yml roles. Empty selects role 1; 'all' selects everything."""
     print("\nRoles:")
     for i, r in enumerate(roles, 1):
-        print(f"  {i}. {r.get('role')}{'  [niche]' if r.get('is_niche_role') else ''}")
+        print(f"  {i}. {r.get('role')}")
     raw = input(f"Select roles (comma-separated 1-{len(roles)}, or 'all') [default: 1]: ").strip()
     if not raw:
         return [roles[0]]
@@ -233,7 +253,7 @@ def _pick_roles_allow(roles: list[dict], style: str) -> list[dict]:
     """Multi-choice role allowlist for a style. Empty / 'all' selects everything."""
     print(f"\nRoles to allow for '{style}':")
     for i, r in enumerate(roles, 1):
-        print(f"  {i}. {r.get('role')}{'  [niche]' if r.get('is_niche_role') else ''}")
+        print(f"  {i}. {r.get('role')}")
     raw = input(f"Select roles (comma-separated 1-{len(roles)}, or 'all') [default: all]: ").strip()
     if not raw or raw.lower() == "all":
         return roles
@@ -360,11 +380,11 @@ def resolve_plan(
 
 def summarize_plan(plan: list[tuple[str, dict]]) -> None:
     by_style = Counter(style for style, _ in plan)
-    print(f"\nPlan: {len(plan)} job(s) across {len(by_style)} style(s)")
+    log.info(f"\nPlan: {len(plan)} job(s) across {len(by_style)} style(s)")
     for style in sorted(by_style):
         roles_for_style = Counter(r.get("role") for s, r in plan if s == style)
         detail = ", ".join(f"{role}×{n}" for role, n in sorted(roles_for_style.items()))
-        print(f"  {style:<20} {by_style[style]:>3}   ({detail})")
+        log.info(f"  {style:<20} {by_style[style]:>3}   ({detail})")
 
 
 def main() -> None:
@@ -407,6 +427,8 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    log_file = _setup_logging(to_file=not args.dry_run)
+
     version = resolve_version(args)
     version_dir = PROMPTS_DIR / version
     styles = _discover_styles(version_dir)
@@ -421,7 +443,7 @@ def main() -> None:
         sys.exit("Empty plan: nothing to generate.")
 
     temp_label = "unset" if args.temperature is None else args.temperature
-    print(
+    log.info(
         f"\nVersion: {version} | mode: {mode} | model: {model} | temp: {temp_label} | parallel: {args.parallel}"
     )
     summarize_plan(plan)
@@ -429,9 +451,12 @@ def main() -> None:
     if args.dry_run:
         s0, r0 = plan[0]
         sample = assemble_prompt(version_dir, s0, r0)
-        print(f"\n----- sample prompt: {s0} / {r0.get('role')} ({len(sample)} chars) -----")
-        print(sample)
+        log.info(f"\n----- sample prompt: {s0} / {r0.get('role')} ({len(sample)} chars) -----")
+        log.info(sample)
         return
+
+    if log_file:
+        log.info(f"Logging to {log_file}")
 
     client = MyOpenAIClient(model=model, temperature=args.temperature)
     client.validate_api_key()
@@ -447,7 +472,7 @@ def main() -> None:
     # in-flight requests keep their slot. Results are written from this thread as
     # they complete (keeps file writes single-threaded, no lock needed).
     workers = max(1, min(args.parallel, len(plan)))
-    print(f"\nGenerating {len(plan)} job(s) with up to {workers} parallel worker(s)...")
+    log.info(f"\nGenerating {len(plan)} job(s) with up to {workers} parallel worker(s)...")
     n_valid = n_invalid = 0
     started = time.perf_counter()
     with (
@@ -464,20 +489,20 @@ def main() -> None:
             if record is not None:
                 vf.write(record + "\n")
                 n_valid += 1
-                print(f"[{i}/{len(plan)}] OK    {label}")
+                log.info(f"[{i}/{len(plan)}] OK    {label}")
             else:
                 inf.write(json.dumps({"style": style, "role": role, "error": error}) + "\n")
                 n_invalid += 1
-                print(f"[{i}/{len(plan)}] FAIL  {label} -> {error}")
+                log.warning(f"[{i}/{len(plan)}] FAIL  {label} -> {error}")
 
     elapsed = time.perf_counter() - started
     per_job = elapsed / len(plan) if plan else 0.0
     rate = len(plan) / elapsed if elapsed > 0 else 0.0
-    print(
+    log.info(
         f"\nDone in {elapsed:.1f}s  ({len(plan)} jobs, {per_job:.2f}s/job avg, {rate:.1f} jobs/s)  —  valid {n_valid}, invalid {n_invalid}"
     )
-    print(f"Valid:   {n_valid} -> {valid_path}")
-    print(f"Invalid: {n_invalid} -> {invalid_path}")
+    log.info(f"Valid:   {n_valid} -> {valid_path}")
+    log.info(f"Invalid: {n_invalid} -> {invalid_path}")
 
 
 if __name__ == "__main__":
