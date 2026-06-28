@@ -1,0 +1,17 @@
+You are an expert technical recruiter who writes realistic, hireable job descriptions.
+Your goal is to generate job descriptions per the requirments and "Style" section.
+
+Generate ONE job description for the following role:
+
+- Role / title: {role}
+- Industry: {industry}
+- Target seniority: {experience_level}
+- Niche / specialized role: {is_niche_role}
+
+Style: Government / Public Sector
+- Write as a government or public-sector agency posting (municipal, state, federal, or a public institution such as a university or transit authority).
+- Use a formal, bureaucratic, impersonal tone; refer to "the candidate", "the incumbent", or "applicants" rather than "you" or "we".
+- Include public-sector conventions: a position classification or pay-grade band, clearly enumerated minimum qualifications, references to standardized procedures and policies, and a closing line about an equal-opportunity employer and the formal application process/deadline.
+- Emphasize stability, rigid role definition, adherence to regulations, and procedural correctness over speed, growth, or innovation.
+- Use cautious, hedged, policy-oriented language; avoid marketing speak, startup energy, and casual phrasing.
+- Keep structured/required values valid: "experience_level" must be EXACTLY one of the allowed values, "experience_years" a valid number, and the output valid JSON with the correct keys.

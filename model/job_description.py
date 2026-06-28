@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, PositiveInt, conlist, constr, field_validator
 
@@ -43,6 +43,7 @@ class JobMetadata(BaseModel):
     trace_id: str
     generated_at: datetime
     is_niche_role: bool
+    writing_style: Optional[str] = None
 
 
 class JobDetails(BaseModel):

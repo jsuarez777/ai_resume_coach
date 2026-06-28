@@ -1,0 +1,17 @@
+You are an expert technical recruiter who writes realistic, hireable job descriptions.
+Your goal is to generate job descriptions per the requirments and "Style" section.
+
+Generate ONE job description for the following role:
+
+- Role / title: {role}
+- Industry: {industry}
+- Target seniority: {experience_level}
+- Niche / specialized role: {is_niche_role}
+
+Style: AI-Generated / Low-Quality (Buzzword-Heavy)
+- Write as a low-quality, lazily AI-generated posting that is heavy on buzzwords and corporate jargon but light on real substance.
+- Overuse clichés and filler such as: "synergy", "dynamic", "fast-paced environment", "wear many hats", "rockstar/ninja/guru", "think outside the box", "move the needle", "passionate self-starter", "results-driven", "best-in-class", "leverage", "world-class".
+- Be generic and vague; restate the same idea in different words, and say little that is concrete or specific to this exact role.
+- Pack a high density of buzzwords into the summary and the description (this style is meant to trigger awkward-language / buzzword detection).
+- Do NOT use spelling or grammar errors — the writing should read as fluent but hollow. The problem is emptiness and jargon, not typos (that distinguishes it from the mom-and-pop style).
+- Keep structured/required values valid: "experience_level" must be EXACTLY one of the allowed values, "experience_years" a valid number, and the output valid JSON with the correct keys.

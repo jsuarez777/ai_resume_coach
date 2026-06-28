@@ -1,17 +1,24 @@
 #!/usr/bin/env python3
-"""Generate job descriptions one at a time from the prompt templates.
+"""Generate a batch of job descriptions across styles and roles into one JSONL.
 
-For each role in a version's `categories.yml`, this assembles
-`template -> prerequisite -> output-format suffix`, asks the LLM for a single
-job description, validates it against the `JobDescription` Pydantic model, and
-writes valid/invalid records to JSONL.
+Each job is one LLM call: assemble `template -> prerequisite -> output-format
+suffix`, validate into the `JobDescription` model, and append to a single
+timestamped jobs_<ts>.jsonl under data/job_description/<version>/.
+
+Generation modes (which (style, role) pairs to produce):
+  even   - N jobs split as evenly as possible across all styles and roles
+  random - N jobs, each a random (style, role) pick
+  custom - per-style counts entered by hand, then allowed roles per style
+  single - one job per selected role for a single style (the classic flow)
 
 Run from the project root (or anywhere; the project root is added to sys.path):
 
     export OPENAI_API_KEY='sk-...'
-    python app/generate_job_descriptions.py                   # interactive menu (style/version/model/roles)
-    python app/generate_job_descriptions.py --style formal-corporate --limit 3
-    python app/generate_job_descriptions.py --dry-run         # assemble only, no API calls
+    python app/generate_job_descriptions.py                       # interactive menus
+    python app/generate_job_descriptions.py --mode even --count 50
+    python app/generate_job_descriptions.py --mode random --count 30 --seed 7
+    python app/generate_job_descriptions.py --mode single --style formal-corporate --limit 3
+    python app/generate_job_descriptions.py --mode even --count 50 --dry-run   # plan only, no API
 
 Any selection passed as a flag skips its menu; omitted selections prompt a menu
 when run on a TTY, and fall back to defaults when piped/non-interactive.
@@ -20,8 +27,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 import sys
 import uuid
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -36,6 +45,8 @@ from openai_client import MyOpenAIClient, PRICES  # noqa: E402
 DEFAULT_MODEL = "gpt-4.1-mini"
 DEFAULT_VERSION = "v1"
 DEFAULT_STYLE = "formal-corporate"
+DEFAULT_COUNT = 50
+MODES = ["even", "random", "custom", "single"]
 PROMPTS_DIR = PROJECT_ROOT / "prompts" / "job_description"
 OUTPUT_BASE = PROJECT_ROOT / "data" / "job_description"
 
@@ -69,8 +80,8 @@ def extract_json(text: str) -> dict:
     return json.loads(text[start : end + 1])
 
 
-def stamp_metadata(data: dict, role: dict) -> dict:
-    """The pipeline owns trace_id/generated_at; is_niche_role comes from the input."""
+def stamp_metadata(data: dict, role: dict, style: str) -> dict:
+    """The pipeline owns trace_id/generated_at/writing_style; is_niche_role from input."""
     meta = data.get("metadata")
     if not isinstance(meta, dict):
         meta = {}
@@ -78,6 +89,7 @@ def stamp_metadata(data: dict, role: dict) -> dict:
     meta["trace_id"] = str(uuid.uuid4())
     meta["generated_at"] = datetime.now(timezone.utc).isoformat()
     meta["is_niche_role"] = bool(role.get("is_niche_role", False))
+    meta["writing_style"] = style
     return data
 
 
@@ -146,63 +158,159 @@ def _pick_roles(roles: list[dict]) -> list[dict]:
     return chosen or [roles[0]]
 
 
-def resolve_selections(args: argparse.Namespace) -> tuple[str, str, str, list[dict]]:
-    """Resolve version/style/model/roles from flags, falling back to an interactive
-    menu when a flag is omitted and we're on a TTY, else to the defaults."""
-    interactive = _interactive()
+def _ask_int(prompt: str, default: int, minimum: int = 0) -> int:
+    while True:
+        raw = input(f"{prompt} [default: {default}]: ").strip()
+        if not raw:
+            return default
+        if raw.isdigit() and int(raw) >= minimum:
+            return int(raw)
+        print(f"  Enter a whole number >= {minimum}.")
 
+
+def _pick_roles_allow(roles: list[dict], style: str) -> list[dict]:
+    """Multi-choice role allowlist for a style. Empty / 'all' selects everything."""
+    print(f"\nRoles to allow for '{style}':")
+    for i, r in enumerate(roles, 1):
+        print(f"  {i}. {r.get('role')}{'  [niche]' if r.get('is_niche_role') else ''}")
+    raw = input(f"Select roles (comma-separated 1-{len(roles)}, or 'all') [default: all]: ").strip()
+    if not raw or raw.lower() == "all":
+        return roles
+    chosen = [roles[int(t) - 1] for t in raw.split(",") if t.strip().isdigit() and 1 <= int(t) <= len(roles)]
+    return chosen or roles
+
+
+def _even_counts(total: int, n: int) -> list[int]:
+    """Split `total` into `n` buckets differing by at most 1."""
+    if n <= 0:
+        return []
+    base, rem = divmod(total, n)
+    return [base + (1 if i < rem else 0) for i in range(n)]
+
+
+def build_plan_even(styles: list[str], roles: list[dict], total: int) -> list[tuple[str, dict]]:
+    """Distribute `total` jobs evenly across styles, and within each style across roles."""
+    plan: list[tuple[str, dict]] = []
+    for style, scount in zip(styles, _even_counts(total, len(styles))):
+        for role, rcount in zip(roles, _even_counts(scount, len(roles))):
+            plan.extend([(style, role)] * rcount)
+    return plan
+
+
+def build_plan_random(styles: list[str], roles: list[dict], total: int, rng: random.Random) -> list[tuple[str, dict]]:
+    return [(rng.choice(styles), rng.choice(roles)) for _ in range(total)]
+
+
+def build_plan_custom(styles: list[str], roles: list[dict]) -> list[tuple[str, dict]]:
+    """Ask a count per style, then the allowed roles for each style that will generate."""
+    plan: list[tuple[str, dict]] = []
+    print("\nCustom mode: enter how many jobs to generate for each style.")
+    for style in styles:
+        count = _ask_int(f"  {style}", default=0)
+        if count <= 0:
+            continue
+        allowed = _pick_roles_allow(roles, style)
+        for role, rcount in zip(allowed, _even_counts(count, len(allowed))):
+            plan.extend([(style, role)] * rcount)
+    return plan
+
+
+def resolve_version(args: argparse.Namespace) -> str:
     versions = _discover_versions()
     if args.version:
-        version = args.version
-    elif interactive and len(versions) > 1:
-        version = _pick_one("Prompt version:", versions, DEFAULT_VERSION if DEFAULT_VERSION in versions else versions[0])
-    else:
-        version = DEFAULT_VERSION if DEFAULT_VERSION in versions else (versions[0] if versions else DEFAULT_VERSION)
-    version_dir = PROMPTS_DIR / version
+        return args.version
+    if _interactive() and len(versions) > 1:
+        return _pick_one("Prompt version:", versions, DEFAULT_VERSION if DEFAULT_VERSION in versions else versions[0])
+    return DEFAULT_VERSION if DEFAULT_VERSION in versions else (versions[0] if versions else DEFAULT_VERSION)
 
-    styles = _discover_styles(version_dir)
-    if args.style:
-        style = args.style
-    elif interactive and styles:
-        style = _pick_one("Template style:", styles, styles[0])
-    else:
-        style = styles[0] if styles else DEFAULT_STYLE
 
+def resolve_model(args: argparse.Namespace) -> str:
     if args.model:
-        model = args.model
-    elif interactive:
-        model = _pick_model(PRICES, DEFAULT_MODEL if DEFAULT_MODEL in PRICES else list(PRICES)[0])
-    else:
-        model = DEFAULT_MODEL
+        return args.model
+    if _interactive():
+        return _pick_model(PRICES, DEFAULT_MODEL if DEFAULT_MODEL in PRICES else list(PRICES)[0])
+    return DEFAULT_MODEL
 
-    roles = yaml.safe_load(_read(version_dir / "categories.yml"))["roles"]
-    if args.limit is not None:
-        roles = roles[: args.limit]
-    elif interactive:
-        roles = _pick_roles(roles)
 
-    return version, style, model, roles
+def resolve_plan(args: argparse.Namespace, styles: list[str], roles: list[dict]) -> tuple[str, list[tuple[str, dict]]]:
+    """Resolve the generation mode and build the (style, role) plan."""
+    interactive = _interactive()
+
+    mode = args.mode
+    if not mode:
+        mode = _pick_one("Generation mode:", MODES, "even") if interactive else ("single" if args.style else "even")
+
+    if mode == "single":
+        if args.style:
+            style = args.style
+        elif interactive:
+            style = _pick_one("Template style:", styles, styles[0])
+        else:
+            style = styles[0] if styles else DEFAULT_STYLE
+        if args.limit is not None:
+            sel = roles[: args.limit]
+        elif interactive:
+            sel = _pick_roles(roles)
+        else:
+            sel = roles
+        return mode, [(style, r) for r in sel]
+
+    if mode == "custom":
+        if not interactive:
+            sys.exit("custom mode requires an interactive terminal (use --mode even/random with --count for scripting).")
+        return mode, build_plan_custom(styles, roles)
+
+    # even / random need a total count
+    total = args.count if args.count is not None else (_ask_int("How many jobs?", DEFAULT_COUNT, minimum=1) if interactive else DEFAULT_COUNT)
+    if mode == "even":
+        return mode, build_plan_even(styles, roles, total)
+    if mode == "random":
+        return mode, build_plan_random(styles, roles, total, random.Random(args.seed))
+    sys.exit(f"Unknown mode: {mode}")
+
+
+def summarize_plan(plan: list[tuple[str, dict]]) -> None:
+    by_style = Counter(style for style, _ in plan)
+    print(f"\nPlan: {len(plan)} job(s) across {len(by_style)} style(s)")
+    for style in sorted(by_style):
+        roles_for_style = Counter(r.get("role") for s, r in plan if s == style)
+        detail = ", ".join(f"{role}×{n}" for role, n in sorted(roles_for_style.items()))
+        print(f"  {style:<20} {by_style[style]:>3}   ({detail})")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", default=None, help="Prompt version folder (menu if omitted; default: v1)")
-    parser.add_argument("--style", default=None, help="Template style, e.g. formal-corporate, casual-startup (menu if omitted)")
+    parser.add_argument("--mode", default=None, choices=MODES, help="Generation mode (menu if omitted)")
+    parser.add_argument("--count", type=int, default=None, help="Total jobs for even/random mode (default: 50)")
+    parser.add_argument("--style", default=None, help="Template style for single mode (menu if omitted)")
+    parser.add_argument("--limit", type=int, default=None, help="single mode: max roles (skips the role menu)")
+    parser.add_argument("--seed", type=int, default=None, help="random mode: RNG seed for reproducibility")
     parser.add_argument("--model", default=None, help=f"Model (menu if omitted; default: {DEFAULT_MODEL})")
-    parser.add_argument("--limit", type=int, default=None, help="Max number of roles to generate (skips the role menu)")
-    parser.add_argument("--dry-run", action="store_true", help="Assemble prompts only; no API calls or files written")
+    parser.add_argument("--dry-run", action="store_true", help="Build the plan only; no API calls or files written")
     args = parser.parse_args()
 
-    version, style, model, roles = resolve_selections(args)
+    version = resolve_version(args)
     version_dir = PROMPTS_DIR / version
+    styles = _discover_styles(version_dir)
+    roles = yaml.safe_load(_read(version_dir / "categories.yml"))["roles"]
+    if not styles:
+        sys.exit(f"No style templates found in {version_dir}")
 
-    print(f"\nVersion: {version} | style: {style} | model: {model} | roles: {len(roles)}")
+    model = resolve_model(args)
+    mode, plan = resolve_plan(args, styles, roles)
+
+    if not plan:
+        sys.exit("Empty plan: nothing to generate.")
+
+    print(f"\nVersion: {version} | mode: {mode} | model: {model}")
+    summarize_plan(plan)
 
     if args.dry_run:
-        for role in roles:
-            prompt = assemble_prompt(version_dir, style, role)
-            print(f"\n===== {role.get('role')} ({len(prompt)} chars) =====")
-            print(prompt)
+        s0, r0 = plan[0]
+        sample = assemble_prompt(version_dir, s0, r0)
+        print(f"\n----- sample prompt: {s0} / {r0.get('role')} ({len(sample)} chars) -----")
+        print(sample)
         return
 
     client = MyOpenAIClient(model=model)
@@ -216,21 +324,21 @@ def main() -> None:
 
     n_valid = n_invalid = 0
     with valid_path.open("w") as vf, invalid_path.open("w") as inf:
-        for i, role in enumerate(roles, 1):
-            label = role.get("role", f"role_{i}")
+        for i, (style, role) in enumerate(plan, 1):
+            label = f"{style}/{role.get('role', f'role_{i}')}"
             try:
                 prompt = assemble_prompt(version_dir, style, role)
                 response = client.query(input=prompt)
                 raw = getattr(response, "output_text", None) or str(response)
-                data = stamp_metadata(extract_json(raw), role)
+                data = stamp_metadata(extract_json(raw), role, style)
                 job = JobDescription.model_validate(data)
                 vf.write(job.model_dump_json() + "\n")
                 n_valid += 1
-                print(f"[{i}/{len(roles)}] OK    {label}")
+                print(f"[{i}/{len(plan)}] OK    {label}")
             except Exception as exc:  # noqa: BLE001 - record and continue
-                inf.write(json.dumps({"role": role, "error": f"{type(exc).__name__}: {exc}"}) + "\n")
+                inf.write(json.dumps({"style": style, "role": role, "error": f"{type(exc).__name__}: {exc}"}) + "\n")
                 n_invalid += 1
-                print(f"[{i}/{len(roles)}] FAIL  {label} -> {type(exc).__name__}: {exc}")
+                print(f"[{i}/{len(plan)}] FAIL  {label} -> {type(exc).__name__}: {exc}")
 
     print(f"\nValid:   {n_valid} -> {valid_path}")
     print(f"Invalid: {n_invalid} -> {invalid_path}")

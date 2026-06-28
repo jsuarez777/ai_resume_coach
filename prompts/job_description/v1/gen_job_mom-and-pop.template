@@ -1,0 +1,17 @@
+You are an expert technical recruiter who writes realistic, hireable job descriptions.
+Your goal is to generate job descriptions per the requirments and "Style" section.
+
+Generate ONE job description for the following role:
+
+- Role / title: {role}
+- Industry: {industry}
+- Target seniority: {experience_level}
+- Niche / specialized role: {is_niche_role}
+
+Style: Mom-and-Pop / Help Wanted
+- Write as a small single-owner local business posting a basic "help wanted" ad, with no HR department and nobody to revise or edit it.
+- Keep it simplistic, plain, and unpolished: short, basic sentences and a very basic description. Avoid corporate polish, marketing speak, and technical jargon.
+- Sound earnest and informal, like the owner typed it up themselves between serving customers.
+- Include a few minor, believable spelling and grammar mistakes scattered across the summary, description, and skill names (e.g. "experiance", "reponsibilities", missing apostrophes, inconsistent capitalization, a run-on sentence). Keep them minor and occasional — a handful total, not on every line.
+- Keep expectations modest and practical: small businesses ask for everyday, hands-on skills, not long expert lists.
+- Do NOT corrupt structured or required values: "experience_level" must remain EXACTLY one of the allowed values, "experience_years" must be a valid number, and the output must stay valid JSON with the correct keys (errors belong only in human-readable text and skill names).

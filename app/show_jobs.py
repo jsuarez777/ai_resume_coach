@@ -71,6 +71,7 @@ def _fmt_job(idx: int, rec: dict) -> str:
     header = "  ·  ".join(b for b in header_bits if b)
 
     niche = "yes" if meta.get("is_niche_role") else "no"
+    style = meta.get("writing_style") or "—"
     seniority = f"{req.get('experience_level', '?')} ({req.get('experience_years', '?')} yrs)"
     trace = (meta.get("trace_id") or "")[:8]
     generated = (meta.get("generated_at") or "")
@@ -82,7 +83,7 @@ def _fmt_job(idx: int, rec: dict) -> str:
     lines = [
         "─" * 78,
         f"[{idx}] {header}",
-        f"    Seniority : {seniority}        Niche: {niche}",
+        f"    Seniority : {seniority}        Niche: {niche}        Style: {style}",
     ]
     if rec.get("summary"):
         lines.append(f"    Summary   : {rec['summary']}")
