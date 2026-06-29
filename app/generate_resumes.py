@@ -14,7 +14,8 @@ For each job, resumes are produced by rotating fit levels and styles in lockstep
 (resume i uses fits[i % nfits] and styles[i % nstyles]) until the per-job count is
 reached. Each resume is validated into the Resume model (with the same correction
 loop + 429 backoff as the job generator) and written to one timestamped JSONL under
-data/resume/<version>/, tagged with its source job's trace_id.
+data/resume/<version>/, tagged with its source job's trace_id. A companion
+pairs_<ts>.jsonl links each resume to its job (resume_trace_id <-> job_trace_id).
 
 Run from the project root:
 
@@ -262,7 +263,7 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="Plan + sample prompt only, no API")
     args = parser.parse_args()
 
-    _setup_logging(to_file=not args.dry_run)
+    log_file = _setup_logging(to_file=not args.dry_run)
     interactive = gjd._interactive()
 
     version_dir = PROMPTS_DIR / args.version
@@ -331,6 +332,9 @@ def main() -> None:
         log.info(sample)
         return
 
+    if log_file:
+        log.info(f"Logging to {log_file}")
+
     client = gjd.MyOpenAIClient(model=model, temperature=args.temperature)
     client.validate_api_key()
     client.get_client()
@@ -340,6 +344,7 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     valid_path = out_dir / f"resumes_{timestamp}.jsonl"
     invalid_path = out_dir / f"invalid_{timestamp}.jsonl"
+    pairs_path = out_dir / f"pairs_{timestamp}.jsonl"
 
     workers = max(1, min(args.parallel, len(tasks)))
     log.info(f"\nGenerating {len(tasks)} resume(s) with up to {workers} parallel worker(s)...")
@@ -348,6 +353,7 @@ def main() -> None:
     with (
         valid_path.open("w") as vf,
         invalid_path.open("w") as inf,
+        pairs_path.open("w") as pf,
         ThreadPoolExecutor(max_workers=workers) as executor,
     ):
         futures = [
@@ -361,6 +367,20 @@ def main() -> None:
             label = f"{style}/{fit_name} <- job {(job_tid or '?')[:8]}"
             if record is not None:
                 vf.write(record + "\n")
+                resume_meta = json.loads(record).get("metadata", {})
+                pf.write(
+                    json.dumps(
+                        {
+                            "pair_id": str(uuid.uuid4()),
+                            "job_trace_id": job_tid,
+                            "resume_trace_id": resume_meta.get("trace_id"),
+                            "fit_level": fit_name,
+                            "writing_style": resume_meta.get("writing_style"),
+                            "generated_at": datetime.now(timezone.utc).isoformat(),
+                        }
+                    )
+                    + "\n"
+                )
                 n_valid += 1
                 if corrections:
                     n_corrected += 1
@@ -385,6 +405,7 @@ def main() -> None:
     )
     log.info(f"Valid:   {n_valid} -> {valid_path}")
     log.info(f"Invalid: {n_invalid} -> {invalid_path}")
+    log.info(f"Pairs:   {n_valid} -> {pairs_path}")
 
 
 if __name__ == "__main__":
