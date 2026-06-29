@@ -1,0 +1,57 @@
+Return ONLY a single JSON object (no markdown, no code fences, no commentary) that exactly matches this schema:
+
+{
+  "contact_info": {
+    "name": "<string>",
+    "email": "<valid email address>",
+    "phone": "<string, at least 10 characters>",
+    "location": "<string, e.g. 'Austin, TX'>",
+    "linkedin": "<optional URL or null>",
+    "portfolio": "<optional URL or null>"
+  },
+  "education": [
+    {
+      "degree": "<string>",
+      "institution": "<string>",
+      "graduation_date": "<ISO-8601 date, YYYY-MM-DD>",
+      "gpa": "<optional number 0.0-4.0 or null>",
+      "coursework": ["<optional course name>", "..."]
+    }
+  ],
+  "experience": [
+    {
+      "company": "<string>",
+      "title": "<string>",
+      "start_date": "<ISO-8601 date, YYYY-MM-DD>",
+      "end_date": "<ISO-8601 date after start_date, or null for a current role>",
+      "responsibilities": ["<string>", "..."],
+      "achievements": ["<string>", "..."]
+    }
+  ],
+  "skills": [
+    {
+      "name": "<string>",
+      "proficiency_level": "<one of: Beginner, Intermediate, Advanced, Expert>",
+      "years": "<optional positive integer or null>"
+    }
+  ],
+  "metadata": {
+    "trace_id": "<string identifier for this generation>",
+    "generated_at": "<ISO-8601 timestamp, e.g. 2026-06-20T14:30:00Z>",
+    "prompt_template": "<string name of the template used>",
+    "fit_level": "<one of: Excellent, Good, Partial, Poor, Mismatch>",
+    "writing_style": "<one of: Formal, Casual, Technical, Achievement, Career-changer>"
+  }
+}
+
+Rules:
+- Output must be valid JSON that parses directly into the Resume model.
+- "email" must be a valid email address; "phone" must be at least 10 characters.
+- All dates must be ISO-8601 (YYYY-MM-DD); "generated_at" is an ISO-8601 timestamp.
+- "end_date" must be strictly after "start_date" (use null for a current role).
+- "gpa", when present, must be a number between 0.0 and 4.0.
+- "proficiency_level" must be exactly one of the allowed values listed above.
+- "fit_level" must be exactly one of: Excellent, Good, Partial, Poor, Mismatch.
+- "writing_style" must be exactly one of: Formal, Casual, Technical, Achievement, Career-changer.
+- Do not include any keys other than those shown.
+- Do not wrap the JSON in backticks or surrounding prose.

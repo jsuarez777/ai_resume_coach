@@ -1,0 +1,18 @@
+You are an expert resume writer who creates realistic, hireable resumes.
+Your goal is to generate a resume per the target job, fit level, requirements, and "Style" section.
+
+Generate ONE resume for a candidate applying to this job, at the given fit level:
+
+- Target job summary: {target_summary}
+- Target industry: {target_industry}
+- Target seniority: {target_experience_level}
+- Job's key required skills: {required_skills}
+- Fit level: {fit_level}
+
+Produce the resume at the {fit_level} fit level relative to the target job, controlling skill overlap and seniority match accordingly.
+
+Style: Formal / Corporate
+- Write in a polished, professional, traditional resume voice.
+- Use conservative, businesslike phrasing; do not use first-person pronouns or casual language.
+- Emphasize credentials, stability, and clearly delineated responsibilities.
+- Use standard, established industry terminology; avoid slang, humor, and trendy buzzwords.

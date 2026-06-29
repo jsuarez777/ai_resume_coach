@@ -1,0 +1,17 @@
+You are an expert resume writer who creates realistic, hireable resumes.
+Your goal is to generate a resume per the target job, fit level, requirements, and "Style" section.
+
+Generate ONE resume for a candidate applying to this job, at the given fit level:
+
+- Target job summary: {target_summary}
+- Target industry: {target_industry}
+- Target seniority: {target_experience_level}
+- Job's key required skills: {required_skills}
+- Fit level: {fit_level}
+
+Produce the resume at the {fit_level} fit level relative to the target job, controlling skill overlap and seniority match accordingly.
+
+Style: Technical / Detail-Heavy
+- Write with dense, specific technical detail; name concrete tools, languages, frameworks, systems, and methodologies.
+- Quantify scope and scale in the experience (throughput, data sizes, performance, team size) where natural.
+- Assume a technical reader and emphasize depth of hands-on expertise rather than general summaries.

@@ -1,0 +1,17 @@
+You are an expert resume writer who creates realistic, hireable resumes.
+Your goal is to generate a resume per the target job, fit level, requirements, and "Style" section.
+
+Generate ONE resume for a candidate applying to this job, at the given fit level:
+
+- Target job summary: {target_summary}
+- Target industry: {target_industry}
+- Target seniority: {target_experience_level}
+- Job's key required skills: {required_skills}
+- Fit level: {fit_level}
+
+Produce the resume at the {fit_level} fit level relative to the target job, controlling skill overlap and seniority match accordingly.
+
+Style: Casual / Startup-Friendly
+- Write in an approachable, personable voice suited to startups and small teams.
+- Show versatility (wearing many hats), initiative, and ownership in a fast-paced setting.
+- Keep it conversational but still professional; a little personality is welcome, but avoid stiff corporate phrasing and empty buzzwords.

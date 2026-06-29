@@ -1,0 +1,36 @@
+# Fit-level prompts for resume generation.
+# One editable instruction per fit level, keyed by the FitLevel enum values
+# (Excellent | Good | Partial | Poor | Mismatch). The resume generator looks up
+# the entry for the requested fit level and injects it into the prompt so the
+# candidate is built with the intended degree of match to the target job.
+# Thresholds follow project_goals (skill overlap %).
+fit_levels:
+  Excellent: |
+    Build a candidate who is an EXCELLENT fit for the target job (80%+ skill overlap).
+    - Include at least >=80% of the job's required skills, at proficiency levels appropriate to the seniority.
+    - Titles, total years of experience, and seniority clearly match the target role.
+    - Experience and education are directly relevant to the target industry and responsibilities.
+
+  Good: |
+    Build a candidate who is a GOOD fit for the target job (60-80% skill overlap).
+    - Cover roughly 60-80% of the required skills; a few may be missing or weaker.
+    - Seniority and experience broadly match the target role, with minor gaps.
+    - Background is relevant, though not a perfect match in every area.
+
+  Partial: |
+    Build a candidate who is a PARTIAL fit for the target job (40-60% skill overlap).
+    - Cover roughly 40-60% of the required skills,  with noticeable gaps in some core areas.
+    - Seniority or experience is somewhat misaligned (e.g. an adjacent role, or one level off).
+    - Keep the mismatch subtle and realistic, not obviously disqualifying.
+
+  Poor: |
+    Build a candidate who is a POOR fit for the target job (20-40% skill overlap).
+    - Cover only 20-40% of the required skills; most core requirements are missing.
+    - Seniority and/or industry are clearly misaligned (wrong level, or a related-but-different field).
+    - Gaps should be significant, but the resume must still be plausible and internally consistent.
+
+  Mismatch: |
+    Build a candidate who is a COMPLETE MISMATCH for the target job (<20% skill overlap).
+    - Share less than <20% of the required skills; the background, industry, and skill set are largely unrelated.
+    - The candidate would not reasonably be hired for this role.
+    - Even so, the resume must remain realistic and internally consistent for whatever field the candidate actually comes from.

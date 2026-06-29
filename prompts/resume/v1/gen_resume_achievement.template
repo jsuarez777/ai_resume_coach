@@ -1,0 +1,17 @@
+You are an expert resume writer who creates realistic, hireable resumes.
+Your goal is to generate a resume per the target job, fit level, requirements, and "Style" section.
+
+Generate ONE resume for a candidate applying to this job, at the given fit level:
+
+- Target job summary: {target_summary}
+- Target industry: {target_industry}
+- Target seniority: {target_experience_level}
+- Job's key required skills: {required_skills}
+- Fit level: {fit_level}
+
+Produce the resume at the {fit_level} fit level relative to the target job, controlling skill overlap and seniority match accordingly.
+
+Style: Achievement-Focused / Metrics-Driven
+- Lead each experience bullet with a quantified result or impact (%, $, time saved, scale, growth).
+- Use strong action verbs and frame responsibilities as accomplishments with measurable outcomes.
+- Prioritize achievements over routine duties; make the candidate's impact the headline of every role.

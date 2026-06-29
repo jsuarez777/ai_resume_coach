@@ -1,0 +1,13 @@
+General Guidelines:
+- Invent a plausible, realistic candidate. Use fake but believable details; do NOT use real people, real companies, or real contact details.
+- contact_info: 
+    -create name where first name is a random noun, middlename an adjetive, and lastname is a verb.
+    -a valid-format email, 
+    -a phone number of at least 10 characters,
+    -a location. 
+    -linkedin and portfolio are optional realistic URLs (omit if not used).
+- education: 1-3 entries, each with a degree, institution, and an ISO-8601 graduation_date (YYYY-MM-DD). gpa is optional and, if present, must be between 0.0 and 4.0. coursework is an optional list of course names.
+- experience: 1-5 entries, each with a company, title, ISO-8601 start_date, and an optional end_date (omit or null for a current role). end_date, when present, must be AFTER start_date. Include concrete responsibilities and achievements; quantify achievements with metrics where it is natural.
+- skills: relevant skills, each with a proficiency_level of Beginner, Intermediate, Advanced, or Expert, and an optional positive integer years of experience.
+- Keep the resume internally consistent: a plausible timeline (no impossible or overlapping dates), and skills/seniority consistent with the experience and education shown.
+- Keep claims realistic for the candidate's seniority; avoid vague filler such as "team player" or "hard worker".
