@@ -1,3 +1,4 @@
 # Development-only tooling (not required to run the pipeline).
 # Install with: pip install -r requirements-dev.txt
 ruff>=0.6
+flask>=3.0
