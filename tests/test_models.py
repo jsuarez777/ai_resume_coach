@@ -919,3 +919,144 @@ def test_job_description_multiple_companies():
 
     assert model1.company.name == "Company A"
     assert model2.company.name == "Company B"
+
+
+# ============================================================================
+# Evaluator - normalize_skill_tokens (stopword-threshold gate)
+# ============================================================================
+
+
+from app.resume_job_evaluator import (
+    _core_skill_present,
+    missing_core_skills,
+    normalize_skill_tokens,
+)
+
+
+def test_normalize_terse_keeps_extra_stopword_tokens():
+    # "Cloud Infrastructure" has only 2 tokens after baseline stopwords;
+    # EXTRA_STOPWORDS must NOT strip "infrastructure" at that length.
+    toks = normalize_skill_tokens("Cloud Infrastructure")
+    assert "infrastructure" in toks
+
+
+def test_normalize_verbose_strips_extra_stopwords():
+    # Long phrase should drop filler like "expertise" and "depth".
+    toks = normalize_skill_tokens(
+        "demonstrated expertise in depth knowledge of Python and infrastructure"
+    )
+    assert "expertise" not in toks
+    assert "depth" not in toks
+    assert "infrastructure" not in toks
+    assert "python" in toks
+
+
+def test_normalize_all_stopwords_falls_back_to_raw():
+    # If stripping leaves nothing, raw tokens are returned so skill isn't lost.
+    toks = normalize_skill_tokens("simple")
+    assert toks  # non-empty
+
+
+# ============================================================================
+# Evaluator - _core_skill_present (disjunction logic)
+# ============================================================================
+
+
+def _resume_toks(*skills: str) -> set[str]:
+    """Build a resume token set from plain skill strings."""
+    return normalize_skill_tokens(" ".join(skills))
+
+
+def test_core_skill_present_plain_match():
+    rtoks = _resume_toks("Python", "Django")
+    assert _core_skill_present("Python", rtoks) is True
+
+
+def test_core_skill_present_plain_miss():
+    rtoks = _resume_toks("Java", "Spring")
+    assert _core_skill_present("Python", rtoks) is False
+
+
+def test_core_skill_present_disjunction_any_option_matches():
+    # "Python, R, or C++" — resume has Python only; should pass.
+    rtoks = _resume_toks("Python")
+    assert _core_skill_present("Proficiency in Python, R, or C++", rtoks) is True
+
+
+def test_core_skill_present_disjunction_none_match():
+    rtoks = _resume_toks("Java")
+    assert _core_skill_present("Proficiency in Python, R, or C++", rtoks) is False
+
+
+def test_core_skill_present_such_as_enumeration():
+    # "such as" turns the list into options; matching one suffices.
+    rtoks = _resume_toks("Tableau")
+    assert _core_skill_present(
+        "data visualization tools such as Tableau, Power BI, or Looker", rtoks
+    ) is True
+
+
+def test_core_skill_present_including_enumeration():
+    rtoks = _resume_toks("PostgreSQL")
+    assert _core_skill_present(
+        "relational databases including PostgreSQL, MySQL, and SQLite", rtoks
+    ) is True
+
+
+def test_core_skill_present_bare_and_stays_conjunctive():
+    # No LIST_MARKER → "welding inspection blueprints" is conjunctive.
+    # Resume has only 1 of 3 tokens (33 % < CORE_SKILL_COVER=0.5) → miss.
+    rtoks = _resume_toks("welding")
+    assert _core_skill_present("welding inspection blueprints", rtoks) is False
+
+
+def test_core_skill_present_bare_and_mostly_present():
+    # Two of three conjunctive tokens present (67 % >= 0.5) → hit.
+    rtoks = _resume_toks("welding", "inspection")
+    assert _core_skill_present("welding inspection blueprints", rtoks) is True
+
+
+def test_core_skill_present_slash_stays_conjunctive():
+    # "/" (CI/CD) must not split; treat as single token.
+    rtoks = _resume_toks("ci", "cd")
+    # ci/cd normalizes to two tokens; both present → covered.
+    result = _core_skill_present("CI/CD", rtoks)
+    assert result is True
+
+
+# ============================================================================
+# Evaluator - missing_core_skills (integration)
+# ============================================================================
+
+
+def test_missing_core_skills_none_missing():
+    rtoks = _resume_toks("Python", "SQL", "Docker")
+    flag, missing = missing_core_skills(rtoks, ["Python", "SQL", "Docker", "Kubernetes"])
+    assert flag is False
+    assert missing == []
+
+
+def test_missing_core_skills_one_missing():
+    rtoks = _resume_toks("Python", "SQL")
+    flag, missing = missing_core_skills(rtoks, ["Python", "SQL", "Docker"])
+    assert flag is True
+    assert "Docker" in missing
+
+
+def test_missing_core_skills_only_top_3_checked():
+    # 4th required skill is missing but should not be flagged (CORE_SKILLS_TOP_N=3).
+    rtoks = _resume_toks("Python", "SQL", "Docker")
+    flag, missing = missing_core_skills(
+        rtoks, ["Python", "SQL", "Docker", "Kubernetes"]
+    )
+    assert flag is False
+
+
+def test_missing_core_skills_disjunction_clears_flag():
+    # Disjunction: resume has "Tableau" — the "such as" list should clear the flag.
+    rtoks = _resume_toks("Tableau")
+    flag, _ = missing_core_skills(
+        rtoks,
+        ["data visualization tools such as Tableau, Power BI, or Looker"],
+    )
+    assert flag is False

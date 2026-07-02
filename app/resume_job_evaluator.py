@@ -88,8 +88,61 @@ STOPWORDS = {
     "various",
     "modern",
     "etc",
+    "simple",
+    "accurately",
+    "attention",
+    "detail",
 }
+# Extra filler stripped only from verbose ("full sentence") skill phrases, where
+# qualifier/abstraction words pile up and aren't real skill tokens. Gated on token
+# count so terse skill names (e.g. "Cloud Infrastructure") keep every token.
+EXTRA_STOPWORDS = {
+    "expertise",
+    "depth",
+    "infrastructure",
+    "certification",
+    "certified",
+    "qualification",
+    "qualified",
+    "proven",
+    "demonstrated",
+    "comprehensive",
+    "solid",
+    "thorough",
+    "extensive",
+    "relevant",
+    "adherence",
+    "within",
+    "specific",
+    "like",
+    "such",
+    "safely",
+}
+AGGRESSIVE_STOPWORD_THRESHOLD = 3
 SKILL_SUFFIXES = (".js", " developer", " engineer")
+
+# Markers that signal a required skill lists interchangeable examples/alternatives,
+# where matching ANY one item proves the competency (vs. a conjunctive requirement
+# like "welding and inspection" that needs every part). Presence of a marker turns
+# the enumeration's commas and "and" into option separators too.
+LIST_MARKERS = (
+    " or ",
+    " and/or ",
+    "such as",
+    " like ",
+    "including",
+    "includes",
+    "e.g.",
+    "for example",
+    "for instance",
+)
+# Delimiters used to split an enumerated phrase into options (only applied once a
+# LIST_MARKER is present, so plain conjunctions are never split).
+_OPTION_DELIMS = re.compile(
+    r"\bsuch as\b|\bincluding\b|\bincludes\b|\bfor example\b|\bfor instance\b"
+    r"|e\.g\.|\band/or\b|\blike\b|\bor\b|\band\b|,",
+    re.IGNORECASE,
+)
 
 # Awkward-language buzzwords (multi-word phrases checked as substrings)
 BUZZWORDS = [
@@ -175,7 +228,14 @@ def normalize_skill_tokens(text: str) -> set[str]:
         s = s.replace(suf, " ")
     s = re.sub(r"\b\d+(\.\d+)*\b", " ", s)  # version numbers
     s = re.sub(r"[^a-z0-9+#]+", " ", s)  # punctuation -> space (keep c++/c#)
-    return {tok for tok in s.split() if tok and tok not in STOPWORDS}
+    raw = [tok for tok in s.split() if tok]
+    filtered = {tok for tok in raw if tok not in STOPWORDS}
+    # Verbose phrases carry extra filler; strip a more aggressive set once long.
+    if len(filtered) > AGGRESSIVE_STOPWORD_THRESHOLD:
+        filtered = {tok for tok in filtered if tok not in EXTRA_STOPWORDS} or filtered
+    # If the skill is entirely stopwords (e.g. a language literally named "Simple"),
+    # keep the raw tokens rather than dropping the skill to nothing.
+    return filtered or set(raw)
 
 
 def skill_token_set(skills: list[str]) -> set[str]:
@@ -269,14 +329,34 @@ def detect_awkward_language(resume: dict) -> tuple[bool, int]:
     return count > BUZZWORD_DENSITY, count
 
 
+def _token_coverage(tokens: set[str], resume_tokens: set[str]) -> float:
+    return len(tokens & resume_tokens) / len(tokens) if tokens else 0.0
+
+
+def _core_skill_present(core: str, resume_tokens: set[str]) -> bool:
+    """Whether the resume covers one core requirement.
+
+    For a plain requirement, the resume must cover >= CORE_SKILL_COVER of its tokens.
+    For an enumeration ("... such as X, Y, or Z"), the listed items are treated as
+    interchangeable examples: covering ANY single option is enough.
+    """
+    if any(mk in core.lower() for mk in LIST_MARKERS):
+        options = [opt.strip() for opt in _OPTION_DELIMS.split(core) if opt.strip()]
+        for opt in options:
+            otoks = normalize_skill_tokens(opt)
+            if otoks and _token_coverage(otoks, resume_tokens) >= CORE_SKILL_COVER:
+                return True
+        return False
+    ctoks = normalize_skill_tokens(core)
+    return _token_coverage(ctoks, resume_tokens) >= CORE_SKILL_COVER
+
+
 def missing_core_skills(resume_tokens: set[str], required: list[str]) -> tuple[bool, list[str]]:
     missing = []
     for core in required[:CORE_SKILLS_TOP_N]:
-        ctoks = normalize_skill_tokens(core)
-        if not ctoks:
+        if not normalize_skill_tokens(core):  # entirely stopwords -> nothing to match
             continue
-        covered = len(ctoks & resume_tokens) / len(ctoks)
-        if covered < CORE_SKILL_COVER:
+        if not _core_skill_present(core, resume_tokens):
             missing.append(core)
     return bool(missing), missing
 
